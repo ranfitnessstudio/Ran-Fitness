@@ -1,26 +1,270 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 98%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 47.9 95.8% 51.8%;
+    --primary-foreground: 26 83.3% 14.1%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 47.9 95.8% 51.8%;
+    --primary-foreground: 26 83.3% 14.1%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 47.9 95.8% 51.8%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme {
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-display: var(--font-display), Georgia, serif;
 }
+
+/* Custom scrollbars according to modern-web-guidance */
+:root {
+  scrollbar-color: #FACC15 rgba(0, 0, 0, 0.1);
+  scrollbar-width: thin;
+}
+
+.darkScroll {
+  scrollbar-color: #FACC15 #18181b;
+}
+
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #18181b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #FACC15;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #EAB308;
+  }
+}
+
+/* Pulse animation for heartbeat effect on booking callouts */
+@keyframes heartpulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.5);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 12px rgba(250, 204, 21, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+}
+
+.animate-heartpulse {
+  animation: heartpulse 2s infinite;
+}
+
+/* 3D card tilt helper classes */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+/* Yellow Energy background effect */
+.energy-glow {
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, rgba(0,0,0,0) 70%);
+}
+
+.dark .energy-glow {
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.08) 0%, rgba(0,0,0,0) 80%);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* GPU-accelerated animations for premium Hero section */
+@keyframes floatHero {
+  0%, 100% {
+    transform: translateY(0px) translateZ(0);
+  }
+  50% {
+    transform: translateY(-12px) translateZ(0);
+  }
+}
+
+@keyframes rotateRings {
+  0% {
+    transform: rotate(0deg) translateZ(0);
+  }
+  100% {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08) translateZ(0);
+  }
+}
+
+@keyframes sparkPulse {
+  0%, 100% {
+    transform: scale(0.9) translateZ(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.2) translateZ(0);
+    opacity: 0.95;
+  }
+}
+
+.animate-float-hero {
+  animation: floatHero 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-rotate-rings {
+  animation: rotateRings 20s linear infinite;
+  will-change: transform;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.animate-spark-pulse {
+  animation: sparkPulse 2.5s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* Soft grain background noise texture */
+.soft-grain {
+  background-image: radial-gradient(rgba(250, 204, 21, 0.15) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* ================================================
+   VIRTUAL TOUR — Premium 360° Button Animations
+   GPU-accelerated, 60 FPS, no layout shifts
+   ================================================ */
+
+@keyframes tourRingSpin {
+  0% { transform: rotate(0deg) translateZ(0); }
+  100% { transform: rotate(360deg) translateZ(0); }
+}
+
+@keyframes tourRingSpinReverse {
+  0% { transform: rotate(360deg) translateZ(0); }
+  100% { transform: rotate(0deg) translateZ(0); }
+}
+
+@keyframes tourGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(250, 204, 21, 0.15), 0 0 60px rgba(250, 204, 21, 0.05);
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(250, 204, 21, 0.3), 0 0 100px rgba(250, 204, 21, 0.1);
+    transform: scale(1.02) translateZ(0);
+  }
+}
+
+@keyframes tourFloat {
+  0%, 100% { transform: translateY(0px) translateZ(0); }
+  50% { transform: translateY(-8px) translateZ(0); }
+}
+
+@keyframes tourParticleShimmer {
+  0%, 100% { opacity: 0.2; transform: scale(0.8) translateZ(0); }
+  50% { opacity: 0.8; transform: scale(1.3) translateZ(0); }
+}
+
+@keyframes tourScanline {
+  0% { transform: translateY(-100%) translateZ(0); }
+  100% { transform: translateY(100%) translateZ(0); }
+}
+
+.animate-tour-ring-spin {
+  animation: tourRingSpin 12s linear infinite;
+  will-change: transform;
+}
+
+.animate-tour-ring-spin-reverse {
+  animation: tourRingSpinReverse 18s linear infinite;
+  will-change: transform;
+}
+
+.animate-tour-glow-pulse {
+  animation: tourGlowPulse 3s ease-in-out infinite;
+  will-change: transform, box-shadow;
+}
+
+.animate-tour-float {
+  animation: tourFloat 4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-tour-particle {
+  animation: tourParticleShimmer 2.5s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.animate-tour-scanline {
+  animation: tourScanline 4s linear infinite;
+  will-change: transform;
+}
+
