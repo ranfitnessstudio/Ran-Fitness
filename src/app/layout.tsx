@@ -15,10 +15,14 @@ const orbitron = Orbitron({
 });
 
 export const metadata: Metadata = {
-  title: 'RAN Fitness | Premium Gym & CrossFit Training Center Habsiguda',
-  description: 'Join RAN Fitness, Habsiguda\'s premier hybrid training gym. State-of-the-art commercial Aerofit equipment, elite trainers, Zumba, CrossFit programs, and guaranteed body transformations.',
+  title: 'RAN FITNESS | Premium Fitness & CrossFit Training',
+  description: 'Elite fitness, hybrid CrossFit conditioning, premium Aerofit equipment, personalized coaching, and transformation programs at RAN FITNESS.',
   keywords: 'Best Gym in Habsiguda, CrossFit Gym Habsiguda, Gym Near Me, Fitness Center Habsiguda, Zumba Classes Habsiguda, Ran Fitness Hyderabad',
   metadataBase: new URL('https://ranfitness.com'),
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png"
+  },
   openGraph: {
     title: 'RAN Fitness | Premium Gym & CrossFit Habsiguda',
     description: 'Transform your body at RAN Fitness Habsiguda. Professional Aerofit equipment, certified trainers, and customized training plans.',

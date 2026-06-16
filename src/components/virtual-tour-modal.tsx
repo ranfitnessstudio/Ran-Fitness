@@ -156,7 +156,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
       {/* Modal content */}
       <div
         ref={containerRef}
-        className="relative w-full h-full md:w-[85vw] md:h-[85vh] flex flex-col justify-between select-none z-10 p-4 md:p-6"
+        className="relative w-[95vw] h-[95vh] md:w-[95vw] md:h-[85vh] flex flex-col justify-between select-none z-10 p-4 md:p-6"
         onMouseMove={handleMouseMove}
       >
         {/* Header bar: Top Left Title, Top Right Close */}
