@@ -25,7 +25,7 @@ export default async function MemberDashboardPage() {
     redirect('/api/auth/logout');
   }
 
-  // Load member progress, attendance, workout schedule, announcements, settings, goals, diet, trainer notes, progress photos, achievements
+  // Load member progress, attendance, workout schedule, announcements, settings, goals, diet, trainer notes, progress photos, achievements, workout plan, body metrics
   const [
     initialProgress,
     initialAttendance,
@@ -36,7 +36,9 @@ export default async function MemberDashboardPage() {
     dietPlan,
     trainerNotes,
     progressPhotos,
-    achievements
+    achievements,
+    workoutPlan,
+    bodyMetrics
   ] = await Promise.all([
     db.getMemberProgress(member.member_id),
     db.getMemberAttendance(member.member_id),
@@ -47,7 +49,9 @@ export default async function MemberDashboardPage() {
     db.getDietPlan(member.member_id).catch(() => null),
     db.getTrainerNotes(member.member_id).catch(() => []),
     db.getProgressPhotos(member.member_id).catch(() => []),
-    db.getAchievements(member.member_id).catch(() => [])
+    db.getAchievements(member.member_id).catch(() => []),
+    db.getWorkoutPlan(member.member_id).catch(() => null),
+    db.getBodyMetrics(member.member_id).catch(() => [])
   ]);
 
   return (
@@ -63,6 +67,8 @@ export default async function MemberDashboardPage() {
       initialTrainerNotes={trainerNotes}
       initialProgressPhotos={progressPhotos}
       initialAchievements={achievements}
+      initialWorkoutPlan={workoutPlan}
+      initialBodyMetrics={bodyMetrics}
     />
   );
 }

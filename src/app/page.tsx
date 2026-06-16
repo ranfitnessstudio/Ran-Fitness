@@ -23,7 +23,8 @@ import {
   Briefcase,
   Star,
   Activity,
-  Smile
+  Smile,
+  Play
 } from 'lucide-react';
 
 import { db, Trainer, Equipment, MembershipPlan, Transformation, WebsiteSettings, SocialLinks, GymEvent, VirtualTour } from '@/lib/database';
@@ -265,15 +266,23 @@ export default function Home() {
 
   // Smooth scroll handler
   const handleNavClick = (id: string) => {
+    console.log("Navigating to:", id);
     setMobileMenuOpen(false);
-    const el = document.getElementById(id);
-    if (el) {
-      window.scrollTo({
-        top: el.offsetTop - 80,
-        behavior: 'smooth',
-      });
-      setActiveSection(id);
-    }
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        const header = document.querySelector('header');
+        const headerHeight = header ? header.offsetHeight : 80;
+        const elementPosition = el.getBoundingClientRect().top + window.scrollY;
+        const offsetPosition = elementPosition - headerHeight;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
+        });
+        setActiveSection(id);
+      }
+    }, 150);
   };
 
   // Handle Career hiring submission
@@ -386,40 +395,55 @@ export default function Home() {
             </div>
           )}
 
-          {/* Mobile Drawer Menu */}
+          {/* Mobile Drawer Menu & Backdrop */}
           <AnimatePresence>
             {mobileMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="fixed top-16 left-0 right-0 z-30 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-900 py-6 px-4 lg:hidden flex flex-col gap-4 shadow-xl text-zinc-900 dark:text-white"
-              >
-                {['about', 'equipment', 'trainers', 'plans', 'transformations', 'contact'].map((item) => (
+              <>
+                {/* Backdrop Layer */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] lg:hidden pointer-events-auto"
+                />
+                
+                {/* Drawer Container */}
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="fixed top-16 left-0 right-0 z-[9999] bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-900 py-6 px-4 lg:hidden flex flex-col gap-4 shadow-xl text-zinc-900 dark:text-white pointer-events-auto"
+                >
+                  {['about', 'equipment', 'trainers', 'plans', 'transformations', 'contact'].map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => handleNavClick(item)}
+                      className="text-left py-2 border-b border-zinc-100 dark:border-zinc-900 text-sm font-black italic tracking-widest uppercase hover:text-yellow-400 text-zinc-850 dark:text-zinc-200 cursor-pointer pointer-events-auto"
+                    >
+                      {item}
+                    </button>
+                  ))}
                   <button
-                    key={item}
-                    onClick={() => handleNavClick(item)}
-                    className="text-left py-2 border-b border-zinc-100 dark:border-zinc-900 text-sm font-black italic tracking-widest uppercase hover:text-yellow-400 text-zinc-850 dark:text-zinc-200"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setMemberLoginOpen(true);
+                    }}
+                    className="w-full text-center rounded-lg border border-zinc-200 dark:border-zinc-850 py-3 text-sm font-bold uppercase text-zinc-700 dark:text-zinc-200 hover:text-yellow-500 hover:border-yellow-400 bg-transparent mb-1 cursor-pointer pointer-events-auto"
                   >
-                    {item}
+                    Member Login
                   </button>
-                ))}
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setMemberLoginOpen(true);
-                  }}
-                  className="w-full text-center rounded-lg border border-zinc-200 dark:border-zinc-850 py-3 text-sm font-bold uppercase text-zinc-700 dark:text-zinc-200 hover:text-yellow-500 hover:border-yellow-400 bg-transparent mb-1"
-                >
-                  Member Login
-                </button>
-                <button
-                  onClick={() => openBooking('Free Trial Mobile')}
-                  className="w-full text-center rounded-lg bg-yellow-400 py-3 text-sm font-black italic uppercase text-black hover:bg-yellow-300"
-                >
-                  Book Trial Spot
-                </button>
-              </motion.div>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openBooking('Free Trial Mobile');
+                    }}
+                    className="w-full text-center rounded-lg bg-yellow-400 py-3 text-sm font-black italic uppercase text-black hover:bg-yellow-300 cursor-pointer pointer-events-auto"
+                  >
+                    Book Trial Spot
+                  </button>
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
 
@@ -795,118 +819,76 @@ export default function Home() {
                   </div>
                 ) : (
                   <>
-                    {/* Premium 360° Button Centerpiece */}
+                  <div className="mt-12 max-w-3xl mx-auto space-y-8">
+                    {/* Widescreen Preview Card */}
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      whileInView={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.8, delay: 0.2 }}
+                      initial={{ opacity: 0, y: 30 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7 }}
                       viewport={{ once: true }}
-                      className="relative mt-16 mb-12 flex items-center justify-center"
+                      onClick={() => setTourModalOpen(true)}
+                      className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 bg-black cursor-pointer shadow-2xl group transition-all duration-500 hover:border-yellow-400/30"
                     >
-                      {/* Outer ambient particles */}
-                      {[...Array(8)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute w-1.5 h-1.5 bg-yellow-400 rounded-full animate-tour-particle"
-                          style={{
-                            top: `${20 + Math.sin(i * 0.785) * 42}%`,
-                            left: `${50 + Math.cos(i * 0.785) * 42}%`,
-                            animationDelay: `${i * 0.35}s`,
+                      {/* Thumbnail Image */}
+                      {virtualTour.thumbnail_url ? (
+                        <img
+                          src={virtualTour.thumbnail_url}
+                          alt="RAN Fitness Gym Tour Preview"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
                           }}
                         />
-                      ))}
+                      ) : (
+                        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.2] mix-blend-luminosity filter grayscale" style={{ backgroundImage: `url('/images/vascular_gym_muscles.png')` }} />
+                      )}
 
-                      {/* Outer rotating ring 1 — dashed */}
-                      <div className="absolute w-[200px] h-[200px] md:w-[280px] md:h-[280px] lg:w-[320px] lg:h-[320px] animate-tour-ring-spin">
-                        <svg viewBox="0 0 100 100" className="w-full h-full">
-                          <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="0.3" strokeDasharray="3 5" className="text-yellow-400/30" />
-                          {/* Tick marks */}
-                          {[...Array(12)].map((_, i) => {
-                            const angle = (i * 30 * Math.PI) / 180;
-                            return (
-                              <line key={i}
-                                x1={50 + 45 * Math.cos(angle)} y1={50 + 45 * Math.sin(angle)}
-                                x2={50 + 48 * Math.cos(angle)} y2={50 + 48 * Math.sin(angle)}
-                                stroke="currentColor" strokeWidth="0.8" className="text-yellow-400/40"
-                              />
-                            );
-                          })}
-                        </svg>
-                      </div>
+                      {/* Ambient Dark Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/35 group-hover:via-black/10 transition-colors duration-500" />
 
-                      {/* Outer rotating ring 2 — reverse */}
-                      <div className="absolute w-[170px] h-[170px] md:w-[240px] md:h-[240px] lg:w-[270px] lg:h-[270px] animate-tour-ring-spin-reverse">
-                        <svg viewBox="0 0 100 100" className="w-full h-full">
-                          <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="0.4" strokeDasharray="1 8" className="text-zinc-400/20 dark:text-zinc-600/20" />
-                          <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="0.25" className="text-zinc-300/15 dark:text-zinc-700/15" />
-                        </svg>
-                      </div>
-
-                      {/* Main clickable button */}
-                      <button
-                        onClick={() => setTourModalOpen(true)}
-                        className="relative w-[120px] h-[120px] md:w-[180px] md:h-[180px] lg:w-[220px] lg:h-[220px] rounded-full cursor-pointer group animate-tour-float"
-                      >
-                        {/* Glass background */}
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-black dark:from-zinc-900 dark:via-black dark:to-zinc-950 border border-zinc-700/50 dark:border-zinc-800/50 shadow-2xl shadow-black/30 animate-tour-glow-pulse" />
-
-                        {/* Scanline overlay */}
-                        <div className="absolute inset-0 rounded-full overflow-hidden">
-                          <div className="absolute inset-0 w-full h-[2px] bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent animate-tour-scanline" />
-                        </div>
-
-                        {/* Inner ring accent */}
-                        <div className="absolute inset-3 md:inset-4 rounded-full border border-yellow-400/20" />
-                        <div className="absolute inset-5 md:inset-6 rounded-full border border-yellow-400/10" />
-
-                        {/* Center content */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="font-display text-2xl md:text-4xl lg:text-5xl font-black italic text-yellow-400 leading-none group-hover:scale-110 transition-transform duration-300">360°</span>
-                          <span className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-400 group-hover:text-yellow-400/80 transition-colors mt-1 md:mt-2">Virtual Tour</span>
-                        </div>
-
-                        {/* Hover glow ring */}
-                        <div className="absolute -inset-1 rounded-full border-2 border-yellow-400/0 group-hover:border-yellow-400/30 transition-all duration-500 group-hover:shadow-[0_0_30px_rgba(250,204,21,0.2)]" />
-                      </button>
-                    </motion.div>
-
-                    {/* Video preview info card */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 15 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.4 }}
-                      viewport={{ once: true }}
-                      className="max-w-md mx-auto"
-                    >
-                      <div className="p-5 rounded-xl bg-white/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 backdrop-blur-sm">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-8 h-8 rounded-full bg-yellow-400/10 flex items-center justify-center">
-                            <span className="text-sm">🎥</span>
+                      {/* Centered Glass Play Button with Rotating Orbit Ring */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="relative flex items-center justify-center">
+                          {/* Pulsing ring */}
+                          <div className="absolute w-[84px] h-[84px] rounded-full border border-yellow-400/40 animate-ping opacity-60" />
+                          <div className="absolute w-[110px] h-[110px] rounded-full border border-zinc-500/20 dark:border-zinc-800/40 animate-tour-ring-spin-reverse" />
+                          
+                          <div className="relative h-16 w-16 rounded-full bg-black/60 dark:bg-zinc-900/80 border border-yellow-400/40 backdrop-blur-md flex items-center justify-center group-hover:scale-110 group-hover:bg-yellow-400 group-hover:border-yellow-400 transition-all duration-300 shadow-2xl">
+                            <Play size={24} className="text-yellow-400 group-hover:text-black fill-current translate-x-0.5 transition-colors" />
                           </div>
-                          <h3 className="font-display text-sm font-bold italic uppercase text-zinc-900 dark:text-white">360° Facility Tour</h3>
                         </div>
-                        <p className="text-zinc-500 dark:text-zinc-400 text-xs leading-relaxed mb-4">
-                          Explore every corner of RAN Fitness before your first visit. Walk through the strength floor, CrossFit zone, cardio arena, and recovery area.
-                        </p>
-                        <button
-                          onClick={() => setTourModalOpen(true)}
-                          className="w-full py-2.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-bold uppercase tracking-widest hover:bg-yellow-400 hover:text-black transition-all duration-300"
-                        >
-                          Launch Virtual Tour
-                        </button>
                       </div>
 
-                      {/* Conversion CTA */}
-                      <div className="mt-6 text-center">
-                        <p className="text-zinc-400 text-xs mb-2">Ready to train with us?</p>
-                        <button
-                          onClick={() => { setBookingGoal(''); setBookingOpen(true); }}
-                          className="px-6 py-2.5 rounded-full bg-yellow-400 hover:bg-yellow-500 text-black text-[10px] font-mono font-bold uppercase tracking-widest shadow-lg shadow-yellow-400/20 hover:shadow-yellow-400/40 transition-all duration-300 animate-heartpulse"
-                        >
-                          Book Free Trial
-                        </button>
+                      {/* Content Overlay */}
+                      <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end text-left">
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-yellow-400 text-black shadow-lg">
+                            <span className="h-1.5 w-1.5 rounded-full bg-black animate-pulse" />
+                            FACILITY TOUR
+                          </span>
+                          <h3 className="font-display text-lg md:text-xl font-black italic uppercase text-white mt-1.5 drop-shadow-md">
+                            Walk Through RAN Fitness (360° Walkthrough)
+                          </h3>
+                        </div>
+                        <span className="hidden sm:inline-block text-[10px] font-mono text-zinc-400 uppercase tracking-widest bg-black/40 px-3 py-1.5 rounded border border-zinc-800 backdrop-blur-sm">
+                          HD Video Tour
+                        </span>
                       </div>
                     </motion.div>
+
+                    {/* Conversion CTA */}
+                    <div className="text-center pt-2">
+                      <p className="text-zinc-500 dark:text-zinc-400 text-xs mb-3">
+                        Want to see the setup in person? Book your slot now!
+                      </p>
+                      <button
+                        onClick={() => { setBookingGoal('Virtual Tour Landing Page'); setBookingOpen(true); }}
+                        className="px-6 py-2.5 rounded-full bg-yellow-400 hover:bg-yellow-500 text-black text-[10px] font-mono font-bold uppercase tracking-widest shadow-lg shadow-yellow-400/20 hover:shadow-yellow-400/40 transition-all duration-300 animate-heartpulse"
+                      >
+                        Book Free Trial
+                      </button>
+                    </div>
+                  </div>
                   </>
                 )}
               </div>
@@ -1654,7 +1636,7 @@ export default function Home() {
           </footer>
 
           {/* G. Mobile-Only Emergency Fixed call button (☎ Call Now) */}
-          <div className="sm:hidden fixed bottom-6 left-6 z-40">
+          <div className="sm:hidden fixed bottom-6 left-6 z-[1000]">
             <motion.a
               href="tel:9666345644"
               whileHover={{ scale: 1.1 }}
@@ -1667,7 +1649,7 @@ export default function Home() {
           </div>
 
           {/* Smart Floating Action Bar */}
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/85 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-900 rounded-full py-2.5 px-6 flex items-center gap-6 shadow-2xl transition-colors duration-300">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] bg-white/85 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-900 rounded-full py-2.5 px-6 flex items-center gap-6 shadow-2xl transition-colors duration-300">
             <a
               href="https://instagram.com/ranfitness_habsiguda"
               target="_blank"

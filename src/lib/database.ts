@@ -718,6 +718,10 @@ async function ensureDbInitialized() {
         dinner TEXT,
         snacks TEXT,
         supplements TEXT,
+        calories_target INT DEFAULT 2000,
+        protein_target INT DEFAULT 150,
+        meal_schedule TEXT,
+        compliance_pct INT DEFAULT 100,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `;
@@ -791,7 +795,44 @@ async function ensureDbInitialized() {
       )
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS workout_plans (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT UNIQUE NOT NULL,
+        today_workout TEXT,
+        sets_reps TEXT,
+        exercises TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS body_metrics (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        weight NUMERIC NOT NULL,
+        body_fat NUMERIC NOT NULL,
+        bmi NUMERIC NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS member_ai_chats (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        response_time_ms INT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT`;
+    await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS calories_target INT DEFAULT 2000`;
+    await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS protein_target INT DEFAULT 150`;
+    await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS meal_schedule TEXT`;
+    await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS compliance_pct INT DEFAULT 100`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS virtual_tour (
@@ -2593,7 +2634,7 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     return getLocal(`diet_plan_${memberId}`, null);
   },
 
-  async saveDietPlan(diet: { member_id: string; breakfast: string; lunch: string; dinner: string; snacks: string; supplements: string }): Promise<any> {
+  async saveDietPlan(diet: { member_id: string; breakfast: string; lunch: string; dinner: string; snacks: string; supplements: string; calories_target?: number; protein_target?: number; meal_schedule?: string; compliance_pct?: number }): Promise<any> {
     if (typeof window !== 'undefined') {
       const res = await clientProxy<any>('saveDietPlan', [diet]);
       if (res !== null) return res;
@@ -2604,14 +2645,18 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
       const rows = await sql`
-        INSERT INTO diet_plans (member_id, breakfast, lunch, dinner, snacks, supplements)
-        VALUES (${diet.member_id}, ${diet.breakfast}, ${diet.lunch}, ${diet.dinner}, ${diet.snacks}, ${diet.supplements})
+        INSERT INTO diet_plans (member_id, breakfast, lunch, dinner, snacks, supplements, calories_target, protein_target, meal_schedule, compliance_pct)
+        VALUES (${diet.member_id}, ${diet.breakfast}, ${diet.lunch}, ${diet.dinner}, ${diet.snacks}, ${diet.supplements}, ${diet.calories_target ?? 2000}, ${diet.protein_target ?? 150}, ${diet.meal_schedule ?? ''}, ${diet.compliance_pct ?? 100})
         ON CONFLICT (member_id) DO UPDATE SET
           breakfast = EXCLUDED.breakfast,
           lunch = EXCLUDED.lunch,
           dinner = EXCLUDED.dinner,
           snacks = EXCLUDED.snacks,
-          supplements = EXCLUDED.supplements
+          supplements = EXCLUDED.supplements,
+          calories_target = EXCLUDED.calories_target,
+          protein_target = EXCLUDED.protein_target,
+          meal_schedule = EXCLUDED.meal_schedule,
+          compliance_pct = EXCLUDED.compliance_pct
         RETURNING *
       `;
       return rows[0];
@@ -2681,6 +2726,88 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     const filtered = current.filter(n => n.id !== id);
     setLocal(`trainer_notes_${memberId}`, filtered);
     return true;
+  },
+
+  async getWorkoutPlan(memberId: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('getWorkoutPlan', [memberId]);
+      if (res !== null) return res;
+      return getLocal(`workout_plan_${memberId}`, null);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM workout_plans WHERE member_id = ${memberId} LIMIT 1`;
+      return rows.length > 0 ? rows[0] : null;
+    }
+    return getLocal(`workout_plan_${memberId}`, null);
+  },
+
+  async saveWorkoutPlan(workout: { member_id: string; today_workout: string; sets_reps: string; exercises: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('saveWorkoutPlan', [workout]);
+      if (res !== null) return res;
+      setLocal(`workout_plan_${workout.member_id}`, workout);
+      return workout;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        INSERT INTO workout_plans (member_id, today_workout, sets_reps, exercises)
+        VALUES (${workout.member_id}, ${workout.today_workout}, ${workout.sets_reps}, ${workout.exercises})
+        ON CONFLICT (member_id) DO UPDATE SET
+          today_workout = EXCLUDED.today_workout,
+          sets_reps = EXCLUDED.sets_reps,
+          exercises = EXCLUDED.exercises
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    setLocal(`workout_plan_${workout.member_id}`, workout);
+    return workout;
+  },
+
+  async getBodyMetrics(memberId: string): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any[]>('getBodyMetrics', [memberId]);
+      if (res !== null) return res;
+      return getLocal(`body_metrics_${memberId}`, []);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM body_metrics WHERE member_id = ${memberId} ORDER BY created_at ASC`;
+      return rows;
+    }
+    return getLocal(`body_metrics_${memberId}`, []);
+  },
+
+  async saveBodyMetrics(metric: { member_id: string; weight: number; body_fat: number; bmi: number }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('saveBodyMetrics', [metric]);
+      if (res !== null) return res;
+      const current = getLocal<any[]>(`body_metrics_${metric.member_id}`, []);
+      const newMetric = { id: current.length + 1, ...metric, created_at: new Date().toISOString() };
+      current.push(newMetric);
+      setLocal(`body_metrics_${metric.member_id}`, current);
+      return newMetric;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        INSERT INTO body_metrics (member_id, weight, body_fat, bmi)
+        VALUES (${metric.member_id}, ${metric.weight}, ${metric.body_fat}, ${metric.bmi})
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    const current = getLocal<any[]>(`body_metrics_${metric.member_id}`, []);
+    const newMetric = { id: current.length + 1, ...metric, created_at: new Date().toISOString() };
+    current.push(newMetric);
+    setLocal(`body_metrics_${metric.member_id}`, current);
+    return newMetric;
   },
 
   async getProgressPhotos(memberId: string): Promise<any[]> {
@@ -2951,5 +3078,57 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     }
     setLocal('virtual_tour', fallback);
     return fallback;
+  },
+
+  async saveMemberAiChat(chat: { member_id: string; question: string; provider: string; response_time_ms: number }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('saveMemberAiChat', [chat]);
+      return res;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        INSERT INTO member_ai_chats (member_id, question, provider, response_time_ms)
+        VALUES (${chat.member_id}, ${chat.question}, ${chat.provider}, ${chat.response_time_ms})
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async getAiCoachStatus(): Promise<{ activeMembers: number; totalChats: number; avgResponseTime: number }> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<{ activeMembers: number; totalChats: number; avgResponseTime: number }>('getAiCoachStatus');
+      if (res !== null) return res;
+      return { activeMembers: 1, totalChats: 10, avgResponseTime: 450 };
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const activeCount = await sql`SELECT COUNT(*)::int as count FROM members WHERE status = 'Active'`;
+      const chatStats = await sql`SELECT COUNT(*)::int as count, COALESCE(AVG(response_time_ms)::int, 0) as avg_time FROM member_ai_chats`;
+      return {
+        activeMembers: activeCount[0].count,
+        totalChats: chatStats[0].count,
+        avgResponseTime: chatStats[0].avg_time
+      };
+    }
+    return { activeMembers: 1, totalChats: 10, avgResponseTime: 450 };
+  },
+
+  async getMemberAiChats(memberId: string): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any[]>('getMemberAiChats', [memberId]);
+      if (res !== null) return res;
+      return [];
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      return await sql`SELECT * FROM member_ai_chats WHERE member_id = ${memberId} ORDER BY created_at DESC LIMIT 20`;
+    }
+    return [];
   }
 };

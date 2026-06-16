@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { db } from '@/lib/database';
 
 // High-intent keywords that signal a potential lead
@@ -101,6 +102,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
     }
 
+    const cookieStore = await cookies();
+    const session = cookieStore.get('ran_member_session');
+    let member = null;
+    let dietPlan = null;
+    let workoutPlan = null;
+    let trainerNotes: any[] = [];
+    let bodyMetrics: any[] = [];
+    let attendance: any[] = [];
+
+    if (session && session.value) {
+      member = await db.getMemberById(session.value);
+      if (member) {
+        const [d, w, n, b, a] = await Promise.all([
+          db.getDietPlan(member.member_id).catch(() => null),
+          db.getWorkoutPlan(member.member_id).catch(() => null),
+          db.getTrainerNotes(member.member_id).catch(() => []),
+          db.getBodyMetrics(member.member_id).catch(() => []),
+          db.getMemberAttendance(member.member_id).catch(() => [])
+        ]);
+        dietPlan = d;
+        workoutPlan = w;
+        trainerNotes = n;
+        bodyMetrics = b;
+        attendance = a;
+      }
+    }
+
+    const memberIdLog = member ? member.member_id : 'guest';
+
     // Fetch dynamic context from the DB
     const [settings, plans, trainers, equipment] = await Promise.all([
       db.getSettings(),
@@ -121,8 +151,59 @@ export async function POST(request: Request) {
       .map((e) => `- ${e.name} (${e.category}, ${e.brand}): ${e.description}`)
       .join('\n');
 
-    // Upgraded system prompt – human-like, high-energy, concise, persuasive
-    const systemPrompt = `You are Coach Zeus — a real, experienced gym sales consultant at RAN Fitness. You talk like a high-energy trainer who genuinely cares about people's fitness journeys. You are NOT an AI, you are NOT a virtual assistant — you are a human coach chatting with a potential member on the website.
+    let systemPrompt = '';
+    if (member) {
+      const latestMetric = bodyMetrics.length > 0 ? bodyMetrics[bodyMetrics.length - 1] : null;
+      const latestNote = trainerNotes.length > 0 ? trainerNotes[0] : null;
+      
+      const memberWeight = latestMetric ? `${latestMetric.weight} kg` : 'Not recorded';
+      const memberBodyFat = latestMetric ? `${latestMetric.body_fat}%` : 'Not recorded';
+      const memberBmi = latestMetric ? latestMetric.bmi : 'Not recorded';
+      const memberGoal = member.notes || 'General Fitness';
+      
+      const dietStr = dietPlan 
+        ? `Calories Target: ${dietPlan.calories_target || 2000} kcal, Protein Target: ${dietPlan.protein_target || 150}g, Meal Schedule: ${dietPlan.meal_schedule || 'Flexible'}, Compliance: ${dietPlan.compliance_pct || 100}%. Breakfast: ${dietPlan.breakfast || 'N/A'}, Lunch: ${dietPlan.lunch || 'N/A'}, Snacks: ${dietPlan.snacks || 'N/A'}, Dinner: ${dietPlan.dinner || 'N/A'}, Supplements: ${dietPlan.supplements || 'N/A'}`
+        : 'No diet plan assigned yet.';
+        
+      const workoutStr = workoutPlan
+        ? `Today's Workout: ${workoutPlan.today_workout || 'N/A'}, Sets/Reps: ${workoutPlan.sets_reps || 'N/A'}, Exercises: ${workoutPlan.exercises || 'N/A'}`
+        : 'No workout plan assigned yet.';
+        
+      const notesStr = latestNote 
+        ? `"${latestNote.note}" (Logged at: ${new Date(latestNote.created_at).toLocaleDateString('en-IN')})`
+        : 'No trainer notes recorded yet.';
+
+      const attendanceStr = attendance.length > 0
+        ? `Total check-ins: ${attendance.length}. Last check-in at: ${new Date(attendance[0].check_in_time).toLocaleString('en-IN')}`
+        : 'No attendance logs recorded yet.';
+
+      systemPrompt = `You are Coach Zeus, the personal fitness coach for this member.
+
+Member Data:
+- Name: ${member.name}
+- Weight: ${memberWeight}
+- Goal: ${memberGoal}
+- Body Fat: ${memberBodyFat}
+- BMI: ${memberBmi}
+- Diet Plan: ${dietStr}
+- Workout Plan: ${workoutStr}
+- Trainer Notes: ${notesStr}
+- Attendance History: ${attendanceStr}
+- Membership Information: Type: ${member.membership_type}, Start: ${member.start_date}, End: ${member.end_date}, Status: ${member.status}
+
+Always answer using the member’s actual data before giving general advice.
+
+Personality rules:
+- Always respond in 2-4 sentences max, unless the user specifically asks for details.
+- Sound like a real gym bro — warm, energetic, slightly pushy in a fun way.
+- Use natural phrases like "Bro,", "Let's gooo!", "Honestly,", "No cap,", "Here's the deal —"
+- Never say "I'm an AI", "As a virtual assistant", or anything that breaks the human illusion.
+- If information is missing (e.g. diet plan is not assigned, weight is not recorded), clearly state what is missing (e.g., "Bro, you don't have a diet plan mapped to your profile yet!"), then provide general fitness guidance.
+- Handle questions about: diet, calories, protein, weight loss, workout schedule, progress tracking, trainer notes, membership information by referring to their database record above.
+- If the user asks about something missing, clearly state what is missing, then give solid advice.
+`;
+    } else {
+      systemPrompt = `You are Coach Zeus — a real, experienced gym sales consultant at RAN Fitness. You talk like a high-energy trainer who genuinely cares about people's fitness journeys. You are NOT an AI, you are NOT a virtual assistant — you are a human coach chatting with a potential member on the website.
 
 Personality rules:
 - Always respond in 2-4 sentences max, unless the user specifically asks for details.
@@ -155,6 +236,7 @@ Example:
 ...Let's get you set up!
 TRIGGER_BOOKING: CrossFit / Athletic Power
 `;
+    }
 
     // --- Buying intent detection (fire in background, never block) ---
     const lowerMessage = message.toLowerCase();
@@ -254,6 +336,13 @@ TRIGGER_BOOKING: CrossFit / Athletic Power
           suggestedGoal = match[1].trim();
           cleanedReply = replyText.replace(triggerPattern, '').trim();
         }
+
+        await db.saveMemberAiChat({
+          member_id: memberIdLog,
+          question: message,
+          provider: 'groq',
+          response_time_ms: groqDuration
+        }).catch((e) => console.error(e));
 
         return NextResponse.json({
           reply: cleanedReply,
@@ -360,6 +449,13 @@ TRIGGER_BOOKING: CrossFit / Athletic Power
           cleanedReply = replyText.replace(triggerPattern, '').trim();
         }
 
+        await db.saveMemberAiChat({
+          member_id: memberIdLog,
+          question: message,
+          provider: 'gemini',
+          response_time_ms: geminiDuration
+        }).catch((e) => console.error(e));
+
         return NextResponse.json({
           reply: cleanedReply,
           triggerBooking,
@@ -425,6 +521,13 @@ TRIGGER_BOOKING: CrossFit / Athletic Power
     // Send Telegram Alert because BOTH failed
     const errorDetails = `Groq: ${groqErrorMsg}\nGemini: ${geminiErrorMsg}`;
     sendSystemAlert(errorDetails).catch((err) => console.error('Failed to trigger alert:', err));
+
+    await db.saveMemberAiChat({
+      member_id: memberIdLog,
+      question: message,
+      provider: 'fallback',
+      response_time_ms: fallbackDuration
+    }).catch((e) => console.error(e));
 
     return NextResponse.json({
       reply,

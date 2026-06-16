@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 
 export async function POST() {
   const response = NextResponse.json({ success: true, message: 'Logged out successfully.' });
@@ -16,8 +16,10 @@ export async function POST() {
   return response;
 }
 
-export async function GET() {
-  const response = NextResponse.redirect(new URL('/', 'http://localhost:3000')); // fallback url path is handled by nextjs relative formatting
+export async function GET(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  url.pathname = '/';
+  const response = NextResponse.redirect(url);
   
   response.headers.append(
     'Set-Cookie',

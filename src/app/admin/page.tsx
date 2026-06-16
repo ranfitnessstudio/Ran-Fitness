@@ -102,6 +102,11 @@ export default function AdminDashboard() {
   const [aiMetrics, setAiMetrics] = useState<AiMetric[]>([]);
   const [aiStatus, setAiStatus] = useState<AiProviderStatus[]>([]);
   const [runningHealthCheck, setRunningHealthCheck] = useState(false);
+  const [coachStatus, setCoachStatus] = useState<{ activeMembers: number; totalChats: number; avgResponseTime: number }>({
+    activeMembers: 0,
+    totalChats: 0,
+    avgResponseTime: 0
+  });
 
   // Edit / Form Modal states
   const [editingTrainer, setEditingTrainer] = useState<Partial<Trainer> | null>(null);
@@ -156,7 +161,23 @@ export default function AdminDashboard() {
   const [dietDinner, setDietDinner] = useState('');
   const [dietSnacks, setDietSnacks] = useState('');
   const [dietSupplements, setDietSupplements] = useState('');
+  const [dietCaloriesTarget, setDietCaloriesTarget] = useState('2000');
+  const [dietProteinTarget, setDietProteinTarget] = useState('150');
+  const [dietMealSchedule, setDietMealSchedule] = useState('Standard');
+  const [dietCompliancePct, setDietCompliancePct] = useState('100');
   const [savingDiet, setSavingDiet] = useState(false);
+
+  // Workout Plan editor modal states
+  const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
+  const [workoutModalMemberId, setWorkoutModalMemberId] = useState<string | null>(null);
+  const [workoutModalMemberName, setWorkoutModalMemberName] = useState('');
+  const [workoutTodayWorkout, setWorkoutTodayWorkout] = useState('');
+  const [workoutSetsReps, setWorkoutSetsReps] = useState('');
+  const [workoutExercises, setWorkoutExercises] = useState('');
+  const [savingWorkout, setSavingWorkout] = useState(false);
+
+  // Gym Member search query state
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
   // Trainer Notes editor modal states
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -200,6 +221,10 @@ export default function AdminDashboard() {
     setDietDinner('');
     setDietSnacks('');
     setDietSupplements('');
+    setDietCaloriesTarget('2000');
+    setDietProteinTarget('150');
+    setDietMealSchedule('Standard');
+    setDietCompliancePct('100');
     
     setIsDietModalOpen(true);
     
@@ -211,6 +236,10 @@ export default function AdminDashboard() {
         setDietDinner(plan.dinner || '');
         setDietSnacks(plan.snacks || '');
         setDietSupplements(plan.supplements || '');
+        setDietCaloriesTarget(plan.calories_target?.toString() || '2000');
+        setDietProteinTarget(plan.protein_target?.toString() || '150');
+        setDietMealSchedule(plan.meal_schedule || 'Standard');
+        setDietCompliancePct(plan.compliance_pct?.toString() || '100');
       }
     } catch (err: any) {
       console.error('Failed to load diet plan:', err);
@@ -228,7 +257,11 @@ export default function AdminDashboard() {
         lunch: dietLunch,
         dinner: dietDinner,
         snacks: dietSnacks,
-        supplements: dietSupplements
+        supplements: dietSupplements,
+        calories_target: parseInt(dietCaloriesTarget) || 2000,
+        protein_target: parseInt(dietProteinTarget) || 150,
+        meal_schedule: dietMealSchedule,
+        compliance_pct: parseInt(dietCompliancePct) || 100
       });
       showToastMessage('🥗 Diet plan saved successfully!');
       setIsDietModalOpen(false);
@@ -236,6 +269,52 @@ export default function AdminDashboard() {
       showToastMessage(err.message || 'Failed to save diet plan', 'error');
     } finally {
       setSavingDiet(false);
+    }
+  };
+
+  // Workout plan modal handlers
+  const handleOpenWorkoutModal = async (member: Member) => {
+    if (!member.member_id) return;
+    setWorkoutModalMemberId(member.member_id);
+    setWorkoutModalMemberName(member.name);
+    setSavingWorkout(false);
+    
+    // Set default empty states
+    setWorkoutTodayWorkout('');
+    setWorkoutSetsReps('');
+    setWorkoutExercises('');
+    
+    setIsWorkoutModalOpen(true);
+    
+    try {
+      const plan = await db.getWorkoutPlan(member.member_id);
+      if (plan) {
+        setWorkoutTodayWorkout(plan.today_workout || '');
+        setWorkoutSetsReps(plan.sets_reps || '');
+        setWorkoutExercises(plan.exercises || '');
+      }
+    } catch (err: any) {
+      console.error('Failed to load workout plan:', err);
+    }
+  };
+
+  const handleSaveWorkoutPlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workoutModalMemberId) return;
+    setSavingWorkout(true);
+    try {
+      await db.saveWorkoutPlan({
+        member_id: workoutModalMemberId,
+        today_workout: workoutTodayWorkout,
+        sets_reps: workoutSetsReps,
+        exercises: workoutExercises
+      });
+      showToastMessage('🏋️ Workout plan saved successfully!');
+      setIsWorkoutModalOpen(false);
+    } catch (err: any) {
+      showToastMessage(err.message || 'Failed to save workout plan', 'error');
+    } finally {
+      setSavingWorkout(false);
     }
   };
 
@@ -305,7 +384,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!progressMemberId) return;
     try {
-      const res = await db.saveMemberProgress({
+      await db.saveMemberProgress({
         member_id: progressMemberId,
         weight: parseFloat(pWeight),
         body_fat: parseFloat(pBodyFat),
@@ -315,20 +394,24 @@ export default function AdminDashboard() {
         bmi: parseFloat(pBmi) || 22.0,
         notes: pNotes || 'Admin Entry'
       });
-      if (res) {
-        showToastMessage('📈 Progress metrics entry logged successfully!');
-        setIsAddProgressOpen(false);
-        setProgressMemberId(null);
-        setPWeight('');
-        setPBodyFat('');
-        setPChest('');
-        setPWaist('');
-        setPArms('');
-        setPBmi('');
-        setPNotes('');
-        const updated = await db.getMembers();
-        setMembers(updated);
-      }
+      await db.saveBodyMetrics({
+        member_id: progressMemberId,
+        weight: parseFloat(pWeight),
+        body_fat: parseFloat(pBodyFat),
+        bmi: parseFloat(pBmi) || 22.0
+      });
+      showToastMessage('📈 Progress metrics entry logged successfully!');
+      setIsAddProgressOpen(false);
+      setProgressMemberId(null);
+      setPWeight('');
+      setPBodyFat('');
+      setPChest('');
+      setPWaist('');
+      setPArms('');
+      setPBmi('');
+      setPNotes('');
+      const updated = await db.getMembers();
+      setMembers(updated);
     } catch (err: any) {
       showToastMessage(err.message || 'Failed to save progress metrics', 'error');
     }
@@ -404,7 +487,7 @@ export default function AdminDashboard() {
 
   const loadAllData = async () => {
     try {
-      const [le, car, ev, tr, eq, pl, tf, se, so, met, stat, mem, ann, sched, att, allAtt, neonActive] = await Promise.all([
+      const [le, car, ev, tr, eq, pl, tf, se, so, met, stat, mem, ann, sched, att, allAtt, neonActive, aiCoachStat] = await Promise.all([
         db.getLeads(),
         db.getCareers(),
         db.getEvents(),
@@ -421,7 +504,8 @@ export default function AdminDashboard() {
         db.getWorkoutSchedule(),
         db.getDailyAttendance(attendanceDate),
         db.getAllAttendance().catch(() => []),
-        db.isNeonActive().catch(() => false)
+        db.isNeonActive().catch(() => false),
+        db.getAiCoachStatus().catch(() => ({ activeMembers: 0, totalChats: 0, avgResponseTime: 0 }))
       ]);
       setLeads(le);
       setCareers(car);
@@ -440,6 +524,9 @@ export default function AdminDashboard() {
       setAttendanceLogs(att || []);
       setAllAttendanceLogs(allAtt || []);
       setIsNeonActive(!!neonActive);
+      if (aiCoachStat) {
+        setCoachStatus(aiCoachStat);
+      }
 
       // Load virtual tour data
       try {
@@ -1398,9 +1485,18 @@ export default function AdminDashboard() {
 
               {/* Members Table */}
               <div className="bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-900 overflow-hidden p-6 space-y-4">
-                <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-850 dark:text-zinc-200">
-                  Active Member Accounts
-                </h4>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-100 dark:border-zinc-900 pb-4">
+                  <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-850 dark:text-zinc-200">
+                    Active Member Accounts
+                  </h4>
+                  <input
+                    type="text"
+                    placeholder="Search member by name, ID, phone..."
+                    value={memberSearchQuery}
+                    onChange={(e) => setMemberSearchQuery(e.target.value)}
+                    className="w-full sm:w-64 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none font-mono"
+                  />
+                </div>
                 
                 <div className="overflow-x-auto text-[11px] font-mono">
                   <table className="w-full text-left">
@@ -1417,98 +1513,112 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900 text-zinc-700 dark:text-zinc-300">
-                      {members.map((m) => (
-                        <tr key={m.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
-                          <td className="py-2.5 font-bold text-yellow-500">{m.member_id}</td>
-                          <td className="py-2.5 font-sans font-bold text-zinc-900 dark:text-white">{m.name}</td>
-                          <td className="py-2.5">{m.phone}</td>
-                          <td className="py-2.5 uppercase text-[10px]">{m.membership_type}</td>
-                          <td className="py-2.5">{m.start_date}</td>
-                          <td className="py-2.5 font-bold">{m.end_date}</td>
-                          <td className="py-2.5">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                              m.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/20' :
-                              m.status === 'Expiring Soon' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800/20' :
-                              m.status === 'Suspended' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800/20' :
-                              'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800/20'
-                            }`}>
-                              {m.status}
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-right space-x-1.5">
-                            <button
-                              onClick={() => {
-                                setEditingMember(m);
-                                setIsAddMemberOpen(true);
-                              }}
-                              className="text-zinc-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors"
-                              title="Edit Member"
-                            >
-                              <Edit3 size={13} className="inline" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenDietModal(m)}
-                              className="text-zinc-400 hover:text-green-500 dark:hover:text-green-400 transition-colors"
-                              title="Edit Diet Plan"
-                            >
-                              <FileText size={13} className="inline" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenNoteModal(m)}
-                              className="text-zinc-400 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
-                              title="Add Trainer Note"
-                            >
-                              <MessageSquare size={13} className="inline" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setProgressMemberId(m.member_id);
-                                setIsAddProgressOpen(true);
-                              }}
-                              className="text-zinc-400 hover:text-green-500 dark:hover:text-green-400 transition-colors"
-                              title="Log Body Metrics Progress"
-                            >
-                              <TrendingUp size={13} className="inline" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const confirmRenew = confirm(`Renew ${m.name}'s membership plan?`);
-                                if (confirmRenew) {
-                                  // Auto sets start as today, end + 30 days
-                                  const today = new Date().toISOString().split('T')[0];
-                                  let days = 30;
-                                  if (m.membership_type === 'Quarterly') days = 90;
-                                  else if (m.membership_type === 'Half-Yearly') days = 180;
-                                  else if (m.membership_type === 'Yearly') days = 365;
-                                  
-                                  const end = new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
-                                  db.saveMember({
-                                    ...m,
-                                    start_date: today,
-                                    end_date: end,
-                                    status: 'Active',
-                                    notes: 'RENEWAL'
-                                  }).then(() => {
-                                    showToastMessage(`✅ Membership plan for ${m.name} renewed!`);
-                                    db.getMembers().then(setMembers);
-                                  }).catch(err => showToastMessage(err.message || 'Renewal failed', 'error'));
-                                }
-                              }}
-                              className="text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                              title="Quick Renew Membership"
-                            >
-                              <Clock size={13} className="inline" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteMember(m.id!)}
-                              className="text-zinc-400 hover:text-red-500 transition-colors"
-                              title="Delete Member"
-                            >
-                              <Trash2 size={13} className="inline" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {(() => {
+                        const filtered = members.filter(m =>
+                          m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                          m.member_id.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                          m.phone.includes(memberSearchQuery)
+                        );
+                        return filtered.map((m) => (
+                          <tr key={m.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                            <td className="py-2.5 font-bold text-yellow-500">{m.member_id}</td>
+                            <td className="py-2.5 font-sans font-bold text-zinc-900 dark:text-white">{m.name}</td>
+                            <td className="py-2.5">{m.phone}</td>
+                            <td className="py-2.5 uppercase text-[10px]">{m.membership_type}</td>
+                            <td className="py-2.5">{m.start_date}</td>
+                            <td className="py-2.5 font-bold">{m.end_date}</td>
+                            <td className="py-2.5">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                m.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/20' :
+                                m.status === 'Expiring Soon' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800/20' :
+                                m.status === 'Suspended' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800/20' :
+                                'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800/20'
+                              }`}>
+                                {m.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 text-right space-x-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditingMember(m);
+                                  setIsAddMemberOpen(true);
+                                }}
+                                className="text-zinc-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors"
+                                title="Edit Member"
+                              >
+                                <Edit3 size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenDietModal(m)}
+                                className="text-zinc-400 hover:text-green-500 dark:hover:text-green-400 transition-colors"
+                                title="Assign Diet Plan"
+                              >
+                                <FileText size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenWorkoutModal(m)}
+                                className="text-zinc-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors"
+                                title="Assign Workout Plan"
+                              >
+                                <Dumbbell size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenNoteModal(m)}
+                                className="text-zinc-400 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
+                                title="Add Trainer Note"
+                              >
+                                <MessageSquare size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setProgressMemberId(m.member_id);
+                                  setIsAddProgressOpen(true);
+                                }}
+                                className="text-zinc-400 hover:text-green-500 dark:hover:text-green-400 transition-colors"
+                                title="Log Body Metrics Progress"
+                              >
+                                <TrendingUp size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const confirmRenew = confirm(`Renew ${m.name}'s membership plan?`);
+                                  if (confirmRenew) {
+                                    // Auto sets start as today, end + 30 days
+                                    const today = new Date().toISOString().split('T')[0];
+                                    let days = 30;
+                                    if (m.membership_type === 'Quarterly') days = 90;
+                                    else if (m.membership_type === 'Half-Yearly') days = 180;
+                                    else if (m.membership_type === 'Yearly') days = 365;
+                                    
+                                    const end = new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
+                                    db.saveMember({
+                                      ...m,
+                                      start_date: today,
+                                      end_date: end,
+                                      status: 'Active',
+                                      notes: 'RENEWAL'
+                                    }).then(() => {
+                                      showToastMessage(`✅ Membership plan for ${m.name} renewed!`);
+                                      db.getMembers().then(setMembers);
+                                    }).catch(err => showToastMessage(err.message || 'Renewal failed', 'error'));
+                                  }
+                                }}
+                                className="text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                                title="Quick Renew Membership"
+                              >
+                                <Clock size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMember(m.id!)}
+                                className="text-zinc-400 hover:text-red-500 transition-colors"
+                                title="Delete Member"
+                              >
+                                <Trash2 size={13} className="inline" />
+                              </button>
+                            </td>
+                          </tr>
+                        ));
+                      })()}
                       {members.length === 0 && (
                         <tr>
                           <td colSpan={8} className="py-4 text-center text-zinc-500 italic">No gym members registered. Click "Add Gym Member" above to register a member.</td>
@@ -2381,6 +2491,48 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* AI Coach Status Section */}
+                <div className="bg-white dark:bg-zinc-950 p-6 rounded-xl border border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
+                  <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-800 dark:text-zinc-200 mb-4 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+                    AI Coach Status Overview
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {/* Active Members Card */}
+                    <div className="bg-zinc-50 dark:bg-[#0c0c0e] border border-zinc-100 dark:border-zinc-900/50 p-4 rounded-lg flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-500">
+                        <Users size={18} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase block">Active Members</span>
+                        <span className="text-xl font-bold font-display text-zinc-800 dark:text-zinc-100">{coachStatus?.activeMembers ?? 0}</span>
+                      </div>
+                    </div>
+
+                    {/* Total AI Chats Card */}
+                    <div className="bg-zinc-50 dark:bg-[#0c0c0e] border border-zinc-100 dark:border-zinc-900/50 p-4 rounded-lg flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                        <MessageSquare size={18} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase block">Total AI Chats</span>
+                        <span className="text-xl font-bold font-display text-zinc-800 dark:text-zinc-100">{coachStatus?.totalChats ?? 0}</span>
+                      </div>
+                    </div>
+
+                    {/* Average Response Time Card */}
+                    <div className="bg-zinc-50 dark:bg-[#0c0c0e] border border-zinc-100 dark:border-zinc-900/50 p-4 rounded-lg flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
+                        <Clock size={18} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase block">Avg Response Time</span>
+                        <span className="text-xl font-bold font-display text-zinc-800 dark:text-zinc-100">{coachStatus?.avgResponseTime ?? 0} ms</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Charts Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Usage Share Donut */}
@@ -2601,14 +2753,17 @@ export default function AdminDashboard() {
                 {/* Video URL Field */}
                 <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4">
                   <h3 className="text-sm font-mono font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Video Source</h3>
-                  <CloudinaryUpload
-                    label="Cloudinary Video"
-                    value={vtVideoUrl}
-                    onChange={(url) => setVtVideoUrl(url)}
-                    folder="virtual-tour"
-                    fileType="video"
-                    aspect="landscape"
-                  />
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Cloudinary Video URL</label>
+                    <input
+                      type="text"
+                      value={vtVideoUrl}
+                      onChange={(e) => setVtVideoUrl(e.target.value)}
+                      placeholder="https://res.cloudinary.com/xxx/video/upload/ran-tour.mp4"
+                      className="w-full rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-yellow-400/50 font-mono"
+                    />
+                    <p className="text-[9px] text-zinc-400 font-mono">Enter a direct Cloudinary video URL (e.g. mp4, webm)</p>
+                  </div>
 
                   <CloudinaryUpload
                     label="Tour Thumbnail Image"
@@ -2621,6 +2776,10 @@ export default function AdminDashboard() {
                   <div className="flex gap-2 pt-2">
                     <button
                       onClick={async () => {
+                        if (vtVideoUrl && (!vtVideoUrl.startsWith('https://res.cloudinary.com/') || !vtVideoUrl.includes('/video/upload/'))) {
+                          showToastMessage('Invalid Cloudinary Video URL! Must start with https://res.cloudinary.com/ and contain /video/upload/', 'error');
+                          return;
+                        }
                         setVtSaving(true);
                         try {
                           await db.saveVirtualTour({ video_url: vtVideoUrl, thumbnail_url: vtThumbnailUrl });
@@ -2647,60 +2806,18 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Preview Panel — Interactive Video Input */}
+                {/* Preview Panel */}
                 <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4">
                   <h3 className="text-sm font-mono font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Live Preview</h3>
                   {vtVideoUrl ? (
                     <div className="space-y-3">
-                      <div className="relative group aspect-video rounded-lg overflow-hidden bg-black border border-zinc-800">
+                      <div className="aspect-video rounded-lg overflow-hidden bg-black border border-zinc-800">
                         <video
-                          key={vtVideoUrl}
                           src={vtVideoUrl}
                           poster={vtThumbnailUrl || undefined}
                           controls
                           className="w-full h-full object-contain"
                         />
-                        {/* Overlay: Replace / Remove actions */}
-                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <label className="p-1.5 rounded-md bg-zinc-900/80 hover:bg-zinc-900 text-white backdrop-blur-sm cursor-pointer transition-colors" title="Replace video">
-                            <RefreshCw size={12} />
-                            <input
-                              type="file"
-                              accept="video/mp4,video/webm,video/quicktime,video/ogg"
-                              className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const formData = new FormData();
-                                formData.append('file', file);
-                                formData.append('folder', 'virtual-tour');
-                                setVtSaving(true);
-                                try {
-                                  const res = await fetch('/api/cloudinary/upload', { method: 'POST', body: formData });
-                                  if (res.ok) {
-                                    const data = await res.json();
-                                    setVtVideoUrl(data.secure_url);
-                                    showToastMessage('Video replaced successfully!');
-                                  } else {
-                                    showToastMessage('Upload failed', 'error');
-                                  }
-                                } catch {
-                                  showToastMessage('Upload failed', 'error');
-                                }
-                                setVtSaving(false);
-                                e.target.value = '';
-                              }}
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => { setVtVideoUrl(''); showToastMessage('Video removed'); }}
-                            className="p-1.5 rounded-md bg-red-600/80 hover:bg-red-600 text-white backdrop-blur-sm cursor-pointer transition-colors"
-                            title="Remove video"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3 text-[9px] font-mono">
                         <div className="p-2 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
@@ -2716,89 +2833,10 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div
-                      className="aspect-video rounded-lg bg-zinc-100 dark:bg-zinc-900 border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-yellow-400/50 hover:bg-yellow-400/5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 relative"
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('border-yellow-400', 'bg-yellow-400/10', 'scale-[1.01]'); }}
-                      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('border-yellow-400', 'bg-yellow-400/10', 'scale-[1.01]'); }}
-                      onDrop={async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        e.currentTarget.classList.remove('border-yellow-400', 'bg-yellow-400/10', 'scale-[1.01]');
-                        const file = e.dataTransfer.files[0];
-                        if (!file || !file.type.startsWith('video/')) {
-                          showToastMessage('Please drop a video file (MP4, WebM, MOV)', 'error');
-                          return;
-                        }
-                        if (file.size > 100 * 1024 * 1024) {
-                          showToastMessage('Video too large. Maximum 100MB.', 'error');
-                          return;
-                        }
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        formData.append('folder', 'virtual-tour');
-                        setVtSaving(true);
-                        try {
-                          const res = await fetch('/api/cloudinary/upload', { method: 'POST', body: formData });
-                          if (res.ok) {
-                            const data = await res.json();
-                            setVtVideoUrl(data.secure_url);
-                            showToastMessage('Video uploaded successfully!');
-                          } else {
-                            const errData = await res.json().catch(() => ({}));
-                            showToastMessage(errData.error || 'Upload failed', 'error');
-                          }
-                        } catch {
-                          showToastMessage('Upload failed', 'error');
-                        }
-                        setVtSaving(false);
-                      }}
-                      onClick={() => {
-                        const inp = document.createElement('input');
-                        inp.type = 'file';
-                        inp.accept = 'video/mp4,video/webm,video/quicktime,video/ogg';
-                        inp.onchange = async () => {
-                          const file = inp.files?.[0];
-                          if (!file) return;
-                          if (file.size > 100 * 1024 * 1024) {
-                            showToastMessage('Video too large. Maximum 100MB.', 'error');
-                            return;
-                          }
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          formData.append('folder', 'virtual-tour');
-                          setVtSaving(true);
-                          try {
-                            const res = await fetch('/api/cloudinary/upload', { method: 'POST', body: formData });
-                            if (res.ok) {
-                              const data = await res.json();
-                              setVtVideoUrl(data.secure_url);
-                              showToastMessage('Video uploaded successfully!');
-                            } else {
-                              const errData = await res.json().catch(() => ({}));
-                              showToastMessage(errData.error || 'Upload failed', 'error');
-                            }
-                          } catch {
-                            showToastMessage('Upload failed', 'error');
-                          }
-                          setVtSaving(false);
-                        };
-                        inp.click();
-                      }}
-                    >
-                      {vtSaving ? (
-                        <>
-                          <RefreshCw size={28} className="text-yellow-400 animate-spin" />
-                          <p className="text-[10px] font-mono text-yellow-400 uppercase tracking-wider font-bold">Uploading video...</p>
-                        </>
-                      ) : (
-                        <>
-                          <div className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800">
-                            <Video size={28} className="text-zinc-400" />
-                          </div>
-                          <p className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">Drag & drop video or click to browse</p>
-                          <p className="text-[9px] text-zinc-400 dark:text-zinc-600">MP4, WebM, MOV • Max 100MB</p>
-                        </>
-                      )}
+                    <div className="aspect-video rounded-lg bg-zinc-100 dark:bg-zinc-900 border-2 border-dashed border-zinc-300 dark:border-zinc-800 flex flex-col items-center justify-center gap-2">
+                      <Video size={32} className="text-zinc-400" />
+                      <p className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">No video uploaded yet</p>
+                      <p className="text-[9px] text-zinc-500">Paste a Cloudinary video URL to get started</p>
                     </div>
                   )}
                 </div>
@@ -3496,12 +3534,13 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">BMI (computed)</label>
+                <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">BMI (computed or custom)</label>
                 <input
-                  type="text"
-                  disabled
+                  type="number"
+                  step="0.1"
                   value={pBmi}
-                  className="w-full rounded bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-850 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400 font-bold font-mono cursor-not-allowed"
+                  onChange={(e) => setPBmi(e.target.value)}
+                  className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400 font-bold font-mono focus:outline-none"
                 />
               </div>
               <div className="space-y-1">
@@ -3683,6 +3722,49 @@ export default function AdminDashboard() {
             </h3>
             
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 bg-zinc-50 dark:bg-zinc-900/40 p-3 border border-zinc-100 dark:border-zinc-900 rounded-lg">
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Calories Target (kcal)</label>
+                  <input
+                    type="number"
+                    value={dietCaloriesTarget}
+                    onChange={(e) => setDietCaloriesTarget(e.target.value)}
+                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none font-mono"
+                    placeholder="2000"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Protein Target (g)</label>
+                  <input
+                    type="number"
+                    value={dietProteinTarget}
+                    onChange={(e) => setDietProteinTarget(e.target.value)}
+                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none font-mono"
+                    placeholder="150"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Meal Schedule</label>
+                  <input
+                    type="text"
+                    value={dietMealSchedule}
+                    onChange={(e) => setDietMealSchedule(e.target.value)}
+                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                    placeholder="e.g. 3 meals + 1 shake"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Compliance Target (%)</label>
+                  <input
+                    type="number"
+                    value={dietCompliancePct}
+                    onChange={(e) => setDietCompliancePct(e.target.value)}
+                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none font-mono"
+                    placeholder="100"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Breakfast</label>
                 <textarea
@@ -3786,6 +3868,70 @@ export default function AdminDashboard() {
                 className="px-4 py-2 bg-yellow-400 text-black rounded uppercase tracking-widest font-bold hover:bg-yellow-300 disabled:opacity-50 transition-all"
               >
                 {savingNote ? 'Saving...' : 'Add Note'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Workout Plan Editor Modal */}
+      {isWorkoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setIsWorkoutModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <form onSubmit={handleSaveWorkoutPlan} className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 text-zinc-900 dark:text-white space-y-4">
+            <h3 className="font-display font-black italic text-lg uppercase text-yellow-500 dark:text-yellow-400">
+              Workout Plan for {workoutModalMemberName}
+            </h3>
+            
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Today's Workout (Focus Name)</label>
+                <input
+                  type="text"
+                  value={workoutTodayWorkout}
+                  onChange={(e) => setWorkoutTodayWorkout(e.target.value)}
+                  className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                  placeholder="e.g. Chest + Triceps Hypertrophy"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Sets & Reps Schema</label>
+                <input
+                  type="text"
+                  value={workoutSetsReps}
+                  onChange={(e) => setWorkoutSetsReps(e.target.value)}
+                  className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                  placeholder="e.g. 4 sets of 8-12 reps"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Exercise List (Comma separated)</label>
+                <textarea
+                  value={workoutExercises}
+                  onChange={(e) => setWorkoutExercises(e.target.value)}
+                  className="w-full h-24 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none resize-none"
+                  placeholder="e.g. Flat Barbell Bench Press, Incline Dumbbell Press, Cable Chest Flys, Overhead Tricep Extension"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setIsWorkoutModalOpen(false)}
+                className="px-4 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded uppercase tracking-widest font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingWorkout}
+                className="px-4 py-2 bg-yellow-400 text-black rounded uppercase tracking-widest font-bold hover:bg-yellow-300 disabled:opacity-50 transition-all"
+              >
+                {savingWorkout ? 'Saving...' : 'Save Workout Plan'}
               </button>
             </div>
           </form>

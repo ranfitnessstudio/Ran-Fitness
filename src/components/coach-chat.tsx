@@ -125,7 +125,7 @@ export const CoachChat: React.FC<CoachChatProps> = ({ onOpenBooking }) => {
   return (
     <>
       {/* Floating Circular Toggle Button */}
-      <div className="fixed bottom-24 right-6 z-40 flex items-center gap-3">
+      <div className="fixed bottom-24 right-6 z-[1000] flex items-center gap-3">
         {!isOpen && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -167,7 +167,7 @@ export const CoachChat: React.FC<CoachChatProps> = ({ onOpenBooking }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 50 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            className="fixed bottom-40 right-6 z-40 flex h-[500px] w-[350px] sm:w-[380px] flex-col overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl shadow-2xl transition-colors duration-300"
+            className="fixed bottom-40 right-6 z-[1000] flex h-[500px] w-[350px] sm:w-[380px] flex-col overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl shadow-2xl transition-colors duration-300"
           >
             {/* Header */}
             <div className="flex items-center justify-between bg-zinc-100 dark:bg-zinc-900 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">

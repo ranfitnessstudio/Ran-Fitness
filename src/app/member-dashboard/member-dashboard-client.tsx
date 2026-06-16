@@ -42,6 +42,8 @@ interface MemberDashboardClientProps {
   initialTrainerNotes: any[];
   initialProgressPhotos: any[];
   initialAchievements: any[];
+  initialWorkoutPlan?: any;
+  initialBodyMetrics?: any[];
 }
 
 const actionChips = [
@@ -71,7 +73,9 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   initialDietPlan,
   initialTrainerNotes,
   initialProgressPhotos,
-  initialAchievements
+  initialAchievements,
+  initialWorkoutPlan,
+  initialBodyMetrics
 }) => {
   const router = useRouter();
   
@@ -86,6 +90,8 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const [notesList, setNotesList] = useState<any[]>(initialTrainerNotes);
   const [photosList, setPhotosList] = useState<any[]>(initialProgressPhotos);
   const [achList, setAchList] = useState<any[]>(initialAchievements);
+  const [workoutPlan, setWorkoutPlan] = useState<any>(initialWorkoutPlan);
+  const [bodyMetricsList, setBodyMetricsList] = useState<any[]>(initialBodyMetrics || []);
 
   // General States
   const [checkingIn, setCheckingIn] = useState(false);
@@ -111,7 +117,7 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const [formSuccess, setFormSuccess] = useState('');
 
   // SVG Trend Chart series
-  const [chartTab, setChartTab] = useState<'weight' | 'fat' | 'lean'>('weight');
+  const [chartTab, setChartTab] = useState<'weight' | 'fat' | 'bmi'>('weight');
 
   // Selected workout day
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -450,10 +456,19 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   };
 
   const renderSvgChart = () => {
-    if (progressList.length < 2) {
+    const chartSource = bodyMetricsList.length > 0 
+      ? bodyMetricsList 
+      : progressList.map(p => ({
+          weight: p.weight,
+          body_fat: p.body_fat,
+          bmi: p.bmi,
+          created_at: p.created_at
+        }));
+
+    if (chartSource.length < 2) {
       return (
         <div className="flex h-48 items-center justify-center rounded-xl bg-zinc-900/40 border border-zinc-800 text-xs text-zinc-500 font-mono">
-          Log progress at least twice to see your body metrics trend chart.
+          Log progress or body metrics at least twice to see your body metrics trend chart.
         </div>
       );
     }
@@ -462,19 +477,19 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
     const height = 200;
     const padding = 35;
 
-    const sortedProgress = [...progressList]
+    const sortedProgress = [...chartSource]
       .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
       .slice(-7);
 
-    const getVal = (p: MemberProgress) => {
-      if (chartTab === 'fat') return p.body_fat;
-      if (chartTab === 'lean') return parseFloat((p.weight * (1 - p.body_fat / 100)).toFixed(1));
-      return p.weight;
+    const getVal = (p: any) => {
+      if (chartTab === 'fat') return parseFloat(p.body_fat);
+      if (chartTab === 'bmi') return parseFloat(p.bmi);
+      return parseFloat(p.weight);
     };
 
-    const labelText = chartTab === 'fat' ? 'Body Fat %' : chartTab === 'lean' ? 'Lean Mass (kg)' : 'Weight (kg)';
-    const suffix = chartTab === 'fat' ? '%' : ' kg';
-    const strokeColor = chartTab === 'fat' ? '#f97316' : chartTab === 'lean' ? '#22c55e' : '#facc15';
+    const labelText = chartTab === 'fat' ? 'Body Fat %' : chartTab === 'bmi' ? 'BMI Trend' : 'Weight (kg)';
+    const suffix = chartTab === 'fat' ? '%' : chartTab === 'bmi' ? '' : ' kg';
+    const strokeColor = chartTab === 'fat' ? '#f97316' : chartTab === 'bmi' ? '#22c55e' : '#facc15';
 
     const vals = sortedProgress.map(getVal);
     const minVal = Math.min(...vals) - 1;
@@ -512,10 +527,10 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
               Fat %
             </button>
             <button
-              onClick={() => setChartTab('lean')}
-              className={`px-2.5 py-1 rounded transition-colors ${chartTab === 'lean' ? 'bg-green-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+              onClick={() => setChartTab('bmi')}
+              className={`px-2.5 py-1 rounded transition-colors ${chartTab === 'bmi' ? 'bg-green-500 text-white' : 'text-zinc-400 hover:text-white'}`}
             >
-              Lean Mass
+              BMI Trend
             </button>
           </div>
         </div>
@@ -998,40 +1013,94 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                   {/* Workout Routine Strip */}
                   <section className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 space-y-4">
                     <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 font-mono flex items-center gap-1.5">
-                      <Calendar size={14} className="text-yellow-400" /> Routine: {selectedDay}
+                      <Dumbbell size={14} className="text-yellow-400" /> Workout Plan
                     </h3>
-                    
-                    <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-none">
-                      {daysOfWeek.map((day) => {
-                        const isToday = day === todayName;
-                        const isSelected = day === selectedDay;
-                        return (
-                          <button
-                            key={day}
-                            onClick={() => setSelectedDay(day)}
-                            className={`px-2 py-1 rounded text-[8px] font-mono font-bold uppercase border transition-all flex-shrink-0 ${
-                              isSelected 
-                                ? 'bg-yellow-400 border-yellow-400 text-black' 
-                                : isToday 
-                                  ? 'bg-zinc-850 border-yellow-400/40 text-yellow-400' 
-                                  : 'bg-zinc-950/40 border-zinc-900 text-zinc-500 hover:border-zinc-800'
-                            }`}
-                          >
-                            {day.slice(0, 3)}
-                          </button>
-                        );
-                      })}
-                    </div>
 
-                    {(() => {
-                      const dayRoutine = workoutSchedule.find(s => s.day === selectedDay);
-                      return (
-                        <div className="bg-zinc-950/80 border border-zinc-900 rounded-xl p-3 space-y-2">
-                          <h4 className="text-xs font-bold text-white font-sans">{dayRoutine?.title || 'Recovery'}</h4>
-                          <p className="text-[10px] text-zinc-400 leading-normal font-sans">{dayRoutine?.description || 'Take a light rest day and stretch.'}</p>
+                    {workoutPlan ? (
+                      <div className="bg-zinc-950/80 border border-zinc-900 rounded-xl p-4 space-y-3">
+                        <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
+                          <div>
+                            <span className="text-[8px] text-zinc-500 font-mono block uppercase font-bold">Today's Workout</span>
+                            <h4 className="text-xs font-bold text-yellow-400 font-sans uppercase">{workoutPlan.today_workout || 'No custom name'}</h4>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[8px] text-zinc-500 font-mono block uppercase font-bold">Sets & Reps</span>
+                            <span className="text-[10px] font-mono text-zinc-300 font-bold">{workoutPlan.sets_reps || 'N/A'}</span>
+                          </div>
                         </div>
-                      );
-                    })()}
+                        <div className="space-y-1.5">
+                          <span className="text-[9px] text-zinc-500 font-mono block uppercase font-bold">Exercises List</span>
+                          <div className="grid grid-cols-1 gap-2">
+                            {workoutPlan.exercises ? (
+                              workoutPlan.exercises.split(',').map((ex: string, idx: number) => (
+                                <div key={idx} className="bg-zinc-900/60 rounded px-2.5 py-1.5 text-xs text-zinc-300 font-sans flex items-center gap-2 border border-zinc-850">
+                                  <span className="h-4 w-4 bg-yellow-400/20 text-yellow-400 text-[10px] font-mono font-bold flex items-center justify-center rounded-full">{idx + 1}</span>
+                                  {ex.trim()}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-zinc-550 text-[10px] italic">No exercises added yet.</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-none">
+                          {daysOfWeek.map((day) => {
+                            const isToday = day === todayName;
+                            const isSelected = day === selectedDay;
+                            return (
+                              <button
+                                key={day}
+                                onClick={() => setSelectedDay(day)}
+                                className={`px-2 py-1 rounded text-[8px] font-mono font-bold uppercase border transition-all flex-shrink-0 ${
+                                  isSelected 
+                                    ? 'bg-yellow-400 border-yellow-400 text-black' 
+                                    : isToday 
+                                      ? 'bg-zinc-850 border-yellow-400/40 text-yellow-400' 
+                                      : 'bg-zinc-950/40 border-zinc-900 text-zinc-500 hover:border-zinc-800'
+                                }`}
+                              >
+                                {day.slice(0, 3)}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {(() => {
+                          const dayRoutine = workoutSchedule.find(s => s.day === selectedDay);
+                          return (
+                            <div className="bg-zinc-950/80 border border-zinc-900 rounded-xl p-3 space-y-2">
+                              <h4 className="text-xs font-bold text-white font-sans">{dayRoutine?.title || 'Recovery'}</h4>
+                              <p className="text-[10px] text-zinc-400 leading-normal font-sans">{dayRoutine?.description || 'Take a light rest day and stretch.'}</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Trainer Advisory Note Banner */}
+                  <section className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 space-y-3.5 shadow-lg">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 font-mono flex items-center gap-1.5 border-b border-zinc-850 pb-2">
+                      <MessageSquare size={14} className="text-yellow-400" /> Trainer Advisory
+                    </h3>
+                    {notesList && notesList.length > 0 ? (
+                      <div className="bg-zinc-950/50 border border-zinc-900 rounded-xl p-4 space-y-2 relative">
+                        <span className="absolute top-3 right-4 text-[8px] text-zinc-650 font-mono">
+                          {new Date(notesList[0].created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                        <span className="text-[9px] text-yellow-400 uppercase font-black tracking-wider flex items-center gap-1">
+                          <User size={10} /> Head Coach Vikram
+                        </span>
+                        <p className="text-zinc-300 font-sans text-xs leading-normal pt-1">{notesList[0].note}</p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 bg-zinc-950/40 border border-zinc-900 rounded-xl text-zinc-550 italic text-[10px] font-mono">
+                        No advisory notes from your trainer yet. Keep working hard!
+                      </div>
+                    )}
                   </section>
 
                 </div>
@@ -1296,6 +1365,26 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                   {dietData ? (
                     <div className="space-y-4 font-sans text-xs">
                       
+                      {/* Targets Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-zinc-950 p-4 border border-zinc-900 rounded-xl font-mono text-xs">
+                        <div>
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Calories Target</span>
+                          <span className="text-yellow-400 font-black text-sm">{dietData.calories_target || 2000} kcal</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Protein Target</span>
+                          <span className="text-orange-400 font-black text-sm">{dietData.protein_target || 150}g</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Diet Compliance</span>
+                          <span className="text-green-400 font-black text-sm">{dietData.compliance_pct || 100}%</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Meal Schedule</span>
+                          <span className="text-white font-bold text-xs truncate block">{dietData.meal_schedule || 'Flexible'}</span>
+                        </div>
+                      </div>
+
                       <div className="bg-zinc-950/50 border border-zinc-900 rounded-xl p-4 space-y-1.5">
                         <h4 className="text-[10px] font-mono uppercase font-bold text-yellow-400">🍳 Breakfast</h4>
                         <p className="text-zinc-300 leading-relaxed text-sm whitespace-pre-wrap">{dietData.breakfast || 'None assigned yet.'}</p>
