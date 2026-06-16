@@ -399,11 +399,203 @@ export const EquipmentSvg: React.FC<EquipmentSvgProps> = ({ name, className = ''
     );
   }
 
-  // Default fallback (Simple generic icon)
+  // Squat Rack SVG
+  if (name === 'squatrack') {
+    return (
+      <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
+        <motion.g
+          animate={isHovered ? { y: [0, -4, 0] } : {}}
+          transition={{ duration: 1.5, repeat: isHovered ? Infinity : 0, ease: "easeInOut" }}
+        >
+          {/* Main frame pillars */}
+          <rect x="25" y="15" width="6" height="70" fill={darkGray} />
+          <rect x="69" y="15" width="6" height="70" fill={darkGray} />
+          {/* Top Crossbar */}
+          <rect x="25" y="15" width="50" height="5" fill={darkGray} />
+          {/* Base supports */}
+          <rect x="15" y="80" width="70" height="5" rx="1" fill={lightGray} />
+          {/* Multi-grip pull up handles (yellow accent) */}
+          <path d="M 30 20 L 38 28 M 70 20 L 62 28" stroke={yellow} strokeWidth="2" strokeLinecap="round" />
+          {/* J-Hooks / Safety Arms */}
+          <path d="M 21 55 H 31 V 58 M 69 55 H 79 V 58" stroke={lightGray} strokeWidth="3" strokeLinecap="round" />
+          <rect x="20" y="52" width="5" height="3" fill={yellow} />
+          <rect x="75" y="52" width="5" height="3" fill={yellow} />
+          
+          {/* Barbell resting on hooks */}
+          <motion.g
+            animate={isHovered ? { y: [0, -6, 0] } : {}}
+            transition={{ duration: 1.8, repeat: isHovered ? Infinity : 0, ease: "easeInOut", delay: 0.2 }}
+          >
+            <rect x="10" y="47.5" width="80" height="2" fill={white} />
+            <rect x="18" y="42" width="4" height="13" rx="0.5" fill={yellow} />
+            <rect x="78" y="42" width="4" height="13" rx="0.5" fill={yellow} />
+          </motion.g>
+        </motion.g>
+      </svg>
+    );
+  }
+
+  // Leg Press SVG
+  if (name === 'legpress') {
+    return (
+      <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
+        {/* Frame Structure */}
+        <path d="M 20 80 L 75 35 M 25 80 H 75" stroke={darkGray} strokeWidth="5" strokeLinecap="round" fill="none" />
+        {/* Seat / Padding */}
+        <polygon points="25,65 35,55 45,75 35,80" fill={darkGray} stroke={lightGray} strokeWidth="1" />
+        <rect x="35" y="50" width="6" height="25" rx="1" transform="rotate(-30 35 50)" fill={yellow} />
+        
+        {/* Footplate / Sled */}
+        <motion.g
+          animate={isHovered ? { x: [0, -8, 0], y: [0, 6, 0] } : {}}
+          transition={{ duration: 2, repeat: isHovered ? Infinity : 0, ease: "easeInOut" }}
+        >
+          {/* Angled sled guide slider */}
+          <rect x="55" y="42" width="16" height="6" rx="1" transform="rotate(-39 55 42)" fill={white} />
+          {/* Plate weight loaded */}
+          <circle cx="68" cy="42" r="10" fill={darkGray} stroke={yellow} strokeWidth="2" />
+          <circle cx="68" cy="42" r="6" fill={lightGray} />
+          {/* Footplate */}
+          <line x1="50" y1="36" x2="62" y2="22" stroke={yellow} strokeWidth="4" strokeLinecap="round" />
+        </motion.g>
+      </svg>
+    );
+  }
+
+  // Lat Pulldown SVG
+  if (name === 'latpulldown') {
+    return (
+      <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
+        {/* Vertical Frame Pillar */}
+        <rect x="25" y="15" width="6" height="70" fill={darkGray} />
+        {/* Base support */}
+        <rect x="15" y="80" width="40" height="5" rx="1" fill={lightGray} />
+        {/* Overhead angled arm */}
+        <path d="M 28 15 H 65 V 22" fill="none" stroke={darkGray} strokeWidth="5" strokeLinecap="round" />
+        
+        {/* Weight Selector Stack */}
+        <rect x="20" y="50" width="16" height="30" fill="#27272A" rx="1" />
+        <rect x="20" y="55" width="16" height="2" fill={yellow} />
+        <rect x="20" y="62" width="16" height="2" fill={yellow} />
+        <rect x="20" y="69" width="16" height="2" fill={yellow} />
+
+        {/* Seat Cushion */}
+        <rect x="42" y="65" width="22" height="4" rx="1" fill={darkGray} />
+        <rect x="45" y="69" width="4" height="12" fill={lightGray} />
+        {/* Knee pad rollers */}
+        <circle cx="48" cy="58" r="4" fill={yellow} />
+        
+        {/* Cable, Pulley, Lat Bar */}
+        <circle cx="65" cy="22" r="3" fill={lightGray} />
+        <motion.g
+          animate={isHovered ? { y: [0, 12, 0] } : {}}
+          transition={{ duration: 2.2, repeat: isHovered ? Infinity : 0, ease: "easeInOut" }}
+        >
+          {/* Cable */}
+          <line x1="65" y1="22" x2="65" y2="40" stroke={white} strokeWidth="1" />
+          {/* Lat Pulldown Bar */}
+          <path d="M 50 40 Q 65 38 80 40" fill="none" stroke={yellow} strokeWidth="3.5" strokeLinecap="round" />
+        </motion.g>
+      </svg>
+    );
+  }
+
+  // Slam Ball SVG
+  if (name === 'slamball') {
+    return (
+      <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
+        <motion.g
+          animate={isHovered ? { y: [0, -15, 2, 0], scaleY: [1, 0.95, 1.05, 1] } : {}}
+          transition={{ duration: 1.6, repeat: isHovered ? Infinity : 0, ease: "easeInOut" }}
+          style={{ transformOrigin: "50% 80%" }}
+        >
+          {/* Textured sphere */}
+          <circle cx="50" cy="50" r="28" fill={darkGray} stroke={yellow} strokeWidth="3" />
+          {/* Tread grip patterns */}
+          <path d="M 32 50 C 40 45 60 45 68 50 M 35 40 C 42 36 58 36 65 40 M 35 60 C 42 64 58 64 65 60" fill="none" stroke={lightGray} strokeWidth="1.5" strokeDasharray="3 3" />
+          {/* Core branding center label */}
+          <circle cx="50" cy="50" r="10" fill="#09090B" />
+          <text x="50" y="53" fill={yellow} fontSize="9" fontWeight="black" textAnchor="middle">15</text>
+        </motion.g>
+      </svg>
+    );
+  }
+
+  // Plyometric Box SVG
+  if (name === 'plyobox') {
+    return (
+      <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
+        <motion.g
+          animate={isHovered ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 1.2, repeat: isHovered ? Infinity : 0, ease: "easeInOut" }}
+        >
+          {/* 3D wooden box perspective drawing */}
+          {/* Front Face */}
+          <polygon points="20,50 60,50 60,85 20,85" fill={darkGray} stroke={lightGray} strokeWidth="1.5" />
+          {/* Top Face */}
+          <polygon points="20,50 40,30 80,30 60,50" fill="#27272A" stroke={yellow} strokeWidth="2" />
+          {/* Right Face */}
+          <polygon points="60,50 80,30 80,65 60,85" fill="#1e1e24" stroke={lightGray} strokeWidth="1.5" />
+          
+          {/* Side handles (Cutout slots) */}
+          <rect x="34" y="62" width="12" height="4" rx="2" fill="#09090B" stroke={lightGray} strokeWidth="0.5" />
+          
+          {/* Plywood grains details / Yellow Corner Guards */}
+          <path d="M 20 50 L 25 50 M 60 50 L 55 50 M 20 85 L 20 80 M 60 85 L 60 80" stroke={yellow} strokeWidth="2" />
+          
+          {/* Etched dimension tags */}
+          <text x="40" y="72" fill={white} fontSize="10" fontWeight="bold" textAnchor="middle">30"</text>
+        </motion.g>
+      </svg>
+    );
+  }
+
+  // Resistance Bands SVG
+  if (name === 'resistancebands') {
+    return (
+      <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
+        <motion.g
+          animate={isHovered ? { scaleX: [1, 1.15, 0.95, 1], scaleY: [1, 0.9, 1.05, 1] } : {}}
+          transition={{ duration: 1.4, repeat: isHovered ? Infinity : 0, ease: "easeInOut" }}
+          style={{ transformOrigin: "50% 50%" }}
+        >
+          {/* Band loop 1 */}
+          <ellipse cx="50" cy="50" rx="35" ry="12" fill="none" stroke={yellow} strokeWidth="5" />
+          <ellipse cx="50" cy="50" rx="35" ry="12" fill="none" stroke="#CA8A04" strokeWidth="1.5" />
+
+          {/* Band loop 2 (overlapping) */}
+          <ellipse cx="50" cy="42" rx="30" ry="10" fill="none" stroke={lightGray} strokeWidth="4" />
+
+          {/* Handle sleeve or label wrap */}
+          <rect x="42" y="47" width="16" height="6" rx="1" fill={white} />
+          <text x="50" y="52" fill={darkGray} fontSize="5" fontWeight="bold" textAnchor="middle">RAN FIT</text>
+        </motion.g>
+      </svg>
+    );
+  }
+
+  // Default fallback (Premium Aerofit Gear Silhouette)
   return (
     <svg viewBox="0 0 100 100" className={`w-full h-full ${className}`}>
-      <circle cx="50" cy="50" r="40" fill={darkGray} stroke={yellow} strokeWidth="2" />
-      <path d="M35 50 H65 M50 35 V65" stroke={white} strokeWidth="4" strokeLinecap="round" />
+      <motion.g
+        animate={isHovered ? { rotate: 360 } : {}}
+        transition={{ duration: 10, repeat: isHovered ? Infinity : 0, ease: "linear" }}
+        style={{ transformOrigin: "50% 50%" }}
+      >
+        {/* Outer shield/gear ring */}
+        <circle cx="50" cy="50" r="38" fill={darkGray} stroke={yellow} strokeWidth="2" />
+        <circle cx="50" cy="50" r="32" fill="none" stroke={lightGray} strokeWidth="1" strokeDasharray="4 4" />
+        
+        {/* Wing/star highlights */}
+        <path d="M 50 18 L 53 28 L 63 28 L 55 34 L 58 44 L 50 38 L 42 44 L 45 34 L 37 28 L 47 28 Z" fill={yellow} opacity="0.15" />
+        
+        {/* Stylized Miniature Barbell in the center */}
+        <rect x="30" y="48.5" width="40" height="3" fill={white} />
+        <rect x="34" y="42" width="3" height="16" rx="0.5" fill={yellow} />
+        <rect x="63" y="42" width="3" height="16" rx="0.5" fill={yellow} />
+        <rect x="38" y="45" width="2" height="10" rx="0.5" fill={lightGray} />
+        <rect x="60" y="45" width="2" height="10" rx="0.5" fill={lightGray} />
+      </motion.g>
     </svg>
   );
 };

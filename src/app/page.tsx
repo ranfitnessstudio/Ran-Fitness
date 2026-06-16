@@ -1821,6 +1821,12 @@ const EquipmentCard: React.FC<{ eq: Equipment }> = ({ eq }) => {
     if (n.includes('stair') || n.includes('climber')) return 'stairclimber';
     if (n.includes('rope')) return 'battleropes';
     if (n.includes('kettlebell')) return 'kettlebell';
+    if (n.includes('squat') || n.includes('rack')) return 'squatrack';
+    if (n.includes('leg press')) return 'legpress';
+    if (n.includes('lat pulldown') || n.includes('low row')) return 'latpulldown';
+    if (n.includes('slam ball')) return 'slamball';
+    if (n.includes('plyo') || n.includes('box')) return 'plyobox';
+    if (n.includes('band')) return 'resistancebands';
     return 'generic';
   };
 
@@ -1828,8 +1834,8 @@ const EquipmentCard: React.FC<{ eq: Equipment }> = ({ eq }) => {
     <motion.div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      whileHover={{ y: -6 }}
-      className="rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/10 p-6 flex flex-col justify-between hover:border-yellow-400/30 dark:hover:border-yellow-400/30 transition-all duration-300 group shadow-lg"
+      whileHover={{ y: -6, scale: 1.02 }}
+      className="rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/10 p-6 flex flex-col justify-between hover:border-yellow-400/30 dark:hover:border-yellow-400/30 hover:shadow-[0_0_20px_rgba(250,204,21,0.15)] transition-all duration-300 group shadow-lg"
     >
       <div className="space-y-4">
         <div className="h-28 flex items-center justify-center p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900/50 group-hover:border-yellow-400/10 transition-colors">
