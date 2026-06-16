@@ -26,7 +26,9 @@ import {
   Briefcase,
   AlertTriangle,
   MessageSquare,
-  Video
+  Video,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { db, Trainer, Equipment, MembershipPlan, Transformation, WebsiteSettings, Lead, SocialLinks, GymEvent, CareerApplication, AiMetric, AiProviderStatus, Member, MemberProgress, WorkoutDay, Announcement, Attendance, VirtualTour } from '@/lib/database';
 import { CloudinaryUpload } from '@/components/ui/cloudinary-upload';
@@ -151,6 +153,7 @@ export default function AdminDashboard() {
   // Analytics & Attendance Hub states
   const [allAttendanceLogs, setAllAttendanceLogs] = useState<Attendance[]>([]);
   const [attendanceRange, setAttendanceRange] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [visitorAnalytics, setVisitorAnalytics] = useState<{ totalVisitors: number; todayVisitors: number; weekVisitors: number; returningVisitors: number; conversionRate: number; trialSubmissions: number; bookTrialClicks: number; virtualTourOpens: number; trainerCardClicks: number; equipmentViews: number }>({ totalVisitors: 0, todayVisitors: 0, weekVisitors: 0, returningVisitors: 0, conversionRate: 0, trialSubmissions: 0, bookTrialClicks: 0, virtualTourOpens: 0, trainerCardClicks: 0, equipmentViews: 0 });
 
   // Diet Plan editor modal states
   const [isDietModalOpen, setIsDietModalOpen] = useState(false);
@@ -190,6 +193,32 @@ export default function AdminDashboard() {
   const [successModalData, setSuccessModalData] = useState<Member | null>(null);
   const [isNeonActive, setIsNeonActive] = useState<boolean | null>(null);
   const [copiedId, setCopiedId] = useState(false);
+
+  // Security / Admin Password management states
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordLastUpdated, setPasswordLastUpdated] = useState<string | null>(null);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  const getPasswordStrength = (pass: string): 'Weak' | 'Medium' | 'Strong' | '' => {
+    if (!pass) return '';
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+
+    if (score <= 2) return 'Weak';
+    if (score <= 4) return 'Medium';
+    return 'Strong';
+  };
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -535,6 +564,18 @@ export default function AdminDashboard() {
         setVtVideoUrl(vtData.video_url || '');
         setVtThumbnailUrl(vtData.thumbnail_url || '');
       } catch { }
+
+      // Load visitor analytics
+      try {
+        const vaStats = await db.getVisitorAnalyticsStats();
+        if (vaStats) setVisitorAnalytics(vaStats);
+      } catch { }
+
+      // Load admin credentials last updated timestamp
+      try {
+        const lu = await db.getAdminLastUpdated();
+        setPasswordLastUpdated(lu);
+      } catch { }
     } catch (err) {
       console.error('Failed to load admin panel data:', err);
     }
@@ -569,7 +610,7 @@ export default function AdminDashboard() {
   };
 
   // CSV Lead Exporter
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     if (leads.length === 0) return;
     const headers = ['Name', 'Phone', 'Fitness Goal', 'Preferred Slot', 'Source', 'Date', 'Status', 'Priority'];
     const rows = leads.map(l => [
@@ -582,17 +623,51 @@ export default function AdminDashboard() {
       l.status,
       l.priority
     ]);
-    
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(','))].join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `ran_fitness_leads_${Date.now()}.csv`);
+
+    const escapeXml = (str: string) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    let xmlRows = '';
+    // Header row
+    xmlRows += '<Row>';
+    headers.forEach(h => {
+      xmlRows += `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`;
+    });
+    xmlRows += '</Row>\n';
+    // Data rows
+    rows.forEach(row => {
+      xmlRows += '<Row>';
+      row.forEach(val => {
+        xmlRows += `<Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`;
+      });
+      xmlRows += '</Row>\n';
+    });
+
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="header">
+      <Font ss:Bold="1" ss:Size="11"/>
+      <Interior ss:Color="#FACC15" ss:Pattern="Solid"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="Leads">
+    <Table>
+${xmlRows}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([xmlContent], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ran_fitness_leads_${Date.now()}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const [sendingAnalytics, setSendingAnalytics] = useState(false);
@@ -789,6 +864,48 @@ export default function AdminDashboard() {
     await db.updateSettings(settings);
     alert('Website configuration settings updated successfully!');
     loadAllData();
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('All fields are required.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirm password do not match.');
+      return;
+    }
+
+    const strength = getPasswordStrength(newPassword);
+    if (strength === 'Weak') {
+      setPasswordError('New password is too weak. Must be medium or strong.');
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      const res = await db.updateAdminPassword(currentPassword, newPassword);
+      if (res.success) {
+        setPasswordSuccess('Admin password updated successfully!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        // Reload last updated time
+        const lu = await db.getAdminLastUpdated();
+        setPasswordLastUpdated(lu);
+      } else {
+        setPasswordError(res.error || 'Failed to update password. Check your current password.');
+      }
+    } catch (err: any) {
+      setPasswordError(err.message || 'Internal error updating password.');
+    } finally {
+      setUpdatingPassword(false);
+    }
   };
 
   const toggleLeadStatus = async (id: string, currentStatus: string) => {
@@ -1243,6 +1360,40 @@ export default function AdminDashboard() {
                   <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono block">Yearly Revenue</span>
                     <div className="text-2xl font-black italic text-white font-display">₹{Math.round(yearlyRevenue).toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+
+                {/* Website Visitor Analytics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Visitors</span>
+                    <div className="text-2xl font-black italic text-blue-500 dark:text-blue-400 font-display">{visitorAnalytics.totalVisitors}</div>
+                    <span className="text-[9px] text-zinc-400 font-mono block">Today: {visitorAnalytics.todayVisitors} · Wk: {visitorAnalytics.weekVisitors}</span>
+                  </div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Trial Clicks</span>
+                    <div className="text-2xl font-black italic text-yellow-500 dark:text-yellow-400 font-display">{visitorAnalytics.bookTrialClicks}</div>
+                    <span className="text-[9px] text-zinc-400 font-mono block">CTA engagement</span>
+                  </div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Virtual Tour Opens</span>
+                    <div className="text-2xl font-black italic text-purple-500 dark:text-purple-400 font-display">{visitorAnalytics.virtualTourOpens}</div>
+                    <span className="text-[9px] text-zinc-400 font-mono block">Tour interest</span>
+                  </div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Trainer Engagement</span>
+                    <div className="text-2xl font-black italic text-orange-500 dark:text-orange-400 font-display">{visitorAnalytics.trainerCardClicks}</div>
+                    <span className="text-[9px] text-zinc-400 font-mono block">Card clicks</span>
+                  </div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Equipment Engagement</span>
+                    <div className="text-2xl font-black italic text-cyan-500 dark:text-cyan-400 font-display">{visitorAnalytics.equipmentViews}</div>
+                    <span className="text-[9px] text-zinc-400 font-mono block">Detail views</span>
+                  </div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Conversion %</span>
+                    <div className="text-2xl font-black italic text-green-500 dark:text-green-400 font-display">{visitorAnalytics.conversionRate}%</div>
+                    <span className="text-[9px] text-zinc-400 font-mono block">Returning: {visitorAnalytics.returningVisitors}</span>
                   </div>
                 </div>
 
@@ -1843,12 +1994,12 @@ export default function AdminDashboard() {
                     {sendingAnalytics ? 'Sending...' : 'Trigger Telegram Stats'}
                   </button>
                   <button
-                    onClick={handleExportCSV}
+                    onClick={handleExportExcel}
                     disabled={leads.length === 0}
                     className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-lg bg-yellow-400 text-black px-4 py-2 text-xs font-bold font-mono uppercase hover:bg-yellow-300 disabled:opacity-50 transition-colors"
                   >
                     <Download size={14} />
-                    Export Leads CSV
+                    Export Leads Excel
                   </button>
                 </div>
               </div>
@@ -2245,142 +2396,258 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-
             </div>
           )}
 
           {/* CONFIGURATION SETTINGS TAB */}
           {activeTab === 'settings' && settings && (
-            <form onSubmit={updateSettingsSubmit} className="max-w-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 space-y-6">
-              
-              <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest">Ribbons & Notification Banners</h3>
-              <div className="grid grid-cols-2 gap-6 bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-900">
-                {/* Offer ribbon toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="offerToggle"
-                      checked={settings.offer_banner_active}
-                      onChange={(e) => setSettings({ ...settings, offer_banner_active: e.target.checked })}
-                      className="rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-yellow-500 dark:text-yellow-400 focus:ring-0"
-                    />
-                    <label htmlFor="offerToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Offer Banner Active</label>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Offer Announcement text"
-                    value={settings.offer_banner_text}
-                    onChange={(e) => setSettings({ ...settings, offer_banner_text: e.target.value })}
-                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-2 text-xs focus:outline-none text-zinc-900 dark:text-white"
-                  />
-                </div>
-
-                {/* Announcement toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="announceToggle"
-                      checked={settings.announcement_active}
-                      onChange={(e) => setSettings({ ...settings, announcement_active: e.target.checked })}
-                      className="rounded bg-white dark:bg-zinc-950 border border-zinc-800 text-yellow-500 dark:text-yellow-400 focus:ring-0"
-                    />
-                    <label htmlFor="announceToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Holiday Alert Active</label>
-                  </div>
-                  <textarea
-                    rows={2}
-                    placeholder="Announcement details"
-                    value={settings.announcement_text}
-                    onChange={(e) => setSettings({ ...settings, announcement_text: e.target.value })}
-                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs focus:outline-none text-zinc-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest pt-4">General Homepage Content</h3>
-              
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Title Header</label>
-                  <input
-                    type="text"
-                    value={settings.hero_title}
-                    onChange={(e) => setSettings({ ...settings, hero_title: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Subtitle</label>
-                  <input
-                    type="text"
-                    value={settings.hero_subtitle}
-                    onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">About Text</label>
-                  <textarea
-                    rows={4}
-                    value={settings.about_text}
-                    onChange={(e) => setSettings({ ...settings, about_text: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Address</label>
-                  <input
-                    type="text"
-                    value={settings.contact_address}
-                    onChange={(e) => setSettings({ ...settings, contact_address: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Phone</label>
+            <div className="max-w-2xl space-y-6">
+              <form onSubmit={updateSettingsSubmit} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 space-y-6">
+                
+                <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest">Ribbons & Notification Banners</h3>
+                <div className="grid grid-cols-2 gap-6 bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-900">
+                  {/* Offer ribbon toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="offerToggle"
+                        checked={settings.offer_banner_active}
+                        onChange={(e) => setSettings({ ...settings, offer_banner_active: e.target.checked })}
+                        className="rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-yellow-500 dark:text-yellow-400 focus:ring-0"
+                      />
+                      <label htmlFor="offerToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Offer Banner Active</label>
+                    </div>
                     <input
                       type="text"
-                      value={settings.contact_phone}
-                      onChange={(e) => setSettings({ ...settings, contact_phone: e.target.value })}
+                      placeholder="Offer Announcement text"
+                      value={settings.offer_banner_text}
+                      onChange={(e) => setSettings({ ...settings, offer_banner_text: e.target.value })}
+                      className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-2 text-xs focus:outline-none text-zinc-900 dark:text-white"
+                    />
+                  </div>
+
+                  {/* Announcement toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="announceToggle"
+                        checked={settings.announcement_active}
+                        onChange={(e) => setSettings({ ...settings, announcement_active: e.target.checked })}
+                        className="rounded bg-white dark:bg-zinc-950 border border-zinc-850 text-yellow-500 dark:text-yellow-400 focus:ring-0"
+                      />
+                      <label htmlFor="announceToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Holiday Alert Active</label>
+                    </div>
+                    <textarea
+                      rows={2}
+                      placeholder="Announcement details"
+                      value={settings.announcement_text}
+                      onChange={(e) => setSettings({ ...settings, announcement_text: e.target.value })}
+                      className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs focus:outline-none text-zinc-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest pt-4">General Homepage Content</h3>
+                
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Title Header</label>
+                    <input
+                      type="text"
+                      value={settings.hero_title}
+                      onChange={(e) => setSettings({ ...settings, hero_title: e.target.value })}
                       className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Business Operating Hours</label>
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Subtitle</label>
                     <input
                       type="text"
-                      value={settings.business_hours}
-                      onChange={(e) => setSettings({ ...settings, business_hours: e.target.value })}
+                      value={settings.hero_subtitle}
+                      onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })}
+                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">About Text</label>
+                    <textarea
+                      rows={4}
+                      value={settings.about_text}
+                      onChange={(e) => setSettings({ ...settings, about_text: e.target.value })}
+                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Address</label>
+                    <input
+                      type="text"
+                      value={settings.contact_address}
+                      onChange={(e) => setSettings({ ...settings, contact_address: e.target.value })}
+                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Phone</label>
+                      <input
+                        type="text"
+                        value={settings.contact_phone}
+                        onChange={(e) => setSettings({ ...settings, contact_phone: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Business Operating Hours</label>
+                      <input
+                        type="text"
+                        value={settings.business_hours}
+                        onChange={(e) => setSettings({ ...settings, business_hours: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Google Maps Embed Link</label>
+                    <textarea
+                      rows={2}
+                      value={settings.google_maps_link}
+                      onChange={(e) => setSettings({ ...settings, google_maps_link: e.target.value })}
                       className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Google Maps Embed Link</label>
-                  <textarea
-                    rows={2}
-                    value={settings.google_maps_link}
-                    onChange={(e) => setSettings({ ...settings, google_maps_link: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-              </div>
+                <button
+                  type="submit"
+                  className="w-full rounded-lg bg-yellow-400 text-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-yellow-300 font-mono cursor-pointer"
+                >
+                  Save Settings Configuration
+                </button>
+              </form>
 
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-yellow-400 text-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-yellow-300 font-mono cursor-pointer"
-              >
-                Save Settings Configuration
-              </button>
-            </form>
+              {/* SECURITY / CHANGE PASSWORD PANEL */}
+              <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-zinc-200 dark:border-zinc-900 pb-4 gap-2">
+                  <div>
+                    <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest">Security Configuration</h3>
+                    <p className="text-[10px] text-zinc-500 font-mono uppercase mt-1">Manage Admin CMS Credentials</p>
+                  </div>
+                  {passwordLastUpdated && (
+                    <div className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900/60 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800 self-start sm:self-auto">
+                      LAST UPDATED: {new Date(passwordLastUpdated).toLocaleString('en-US')}
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  {passwordError && (
+                    <div className="p-3 bg-red-950/30 border border-red-500/20 text-red-400 text-xs rounded-lg font-mono">
+                      ❌ {passwordError}
+                    </div>
+                  )}
+                  {passwordSuccess && (
+                    <div className="p-3 bg-green-950/30 border border-green-500/20 text-green-400 text-xs rounded-lg font-mono">
+                      ✅ {passwordSuccess}
+                    </div>
+                  )}
+
+                  {/* Current Password */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Current Password</label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 pl-3 pr-10 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                        placeholder="Enter current password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                      >
+                        {showCurrentPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New Password */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">New Password</label>
+                      {newPassword && (
+                        <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${
+                          getPasswordStrength(newPassword) === 'Strong' 
+                            ? 'bg-green-950 text-green-400 border border-green-500/20' 
+                            : getPasswordStrength(newPassword) === 'Medium'
+                              ? 'bg-yellow-950 text-yellow-400 border border-yellow-500/20'
+                              : 'bg-red-950 text-red-400 border border-red-500/20'
+                        }`}>
+                          Strength: {getPasswordStrength(newPassword)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 pl-3 pr-10 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                        placeholder="Enter new password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                      >
+                        {showNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Confirm New Password</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 pl-3 pr-10 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                        placeholder="Confirm new password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                      >
+                        {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={updatingPassword}
+                    className="w-full rounded-lg bg-zinc-900 border border-zinc-850 hover:border-yellow-400 text-yellow-400 py-3 text-xs font-bold uppercase tracking-widest hover:bg-zinc-850 font-mono disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {updatingPassword ? 'Updating Security Credentials...' : 'Change Password'}
+                  </button>
+                </form>
+              </div>
+            </div>
           )}
 
           {/* AI MONITORING TAB */}

@@ -21,8 +21,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    goal: initialGoal || 'Muscle Gain',
-    preferredTime: 'Evening (6:00 PM - 8:00 PM)',
+    goal: initialGoal || '',
+    preferredTime: 'Evening Peak (5:00 PM - 7:00 PM)',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -144,10 +144,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="Enter your name"
+                    placeholder="ENTER YOUR NAME"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 text-sm focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all text-zinc-900 dark:text-white placeholder-zinc-450 dark:placeholder-zinc-605"
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 text-sm focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all text-zinc-900 dark:text-white placeholder:font-display placeholder:uppercase placeholder:tracking-wider placeholder:text-zinc-400 dark:placeholder:text-zinc-600 placeholder:text-[10px]"
                   />
                 </div>
 
@@ -159,10 +159,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <input
                     type="tel"
                     required
-                    placeholder="Enter 10-digit number"
+                    placeholder="ENTER PHONE NUMBER"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 text-sm focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all text-zinc-900 dark:text-white placeholder-zinc-450 dark:placeholder-zinc-605"
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 text-sm focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all text-zinc-900 dark:text-white placeholder:font-display placeholder:uppercase placeholder:tracking-wider placeholder:text-zinc-400 dark:placeholder:text-zinc-600 placeholder:text-[10px]"
                   />
                 </div>
 
@@ -174,8 +174,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <select
                     value={formData.goal}
                     onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 text-sm focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all text-zinc-900 dark:text-white"
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 text-sm focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all text-zinc-900 dark:text-white font-display"
                   >
+                    <option value="" disabled>SELECT FITNESS GOAL</option>
                     {goals.map((g) => (
                       <option key={g} value={g} className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white">
                         {g}

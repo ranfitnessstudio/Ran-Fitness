@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/database';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -18,16 +19,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
-    // Simple robust admin check
-    // In production, this can be validated via an API endpoint checking bcrypt hashes.
-    // Predefined admin keys: admin / RanFitness2026!
-    setTimeout(() => {
-      if (username === 'admin' && password === 'RanFitness2026!') {
+    try {
+      const isValid = await db.verifyAdminPassword(username, password);
+      if (isValid) {
         // Successful login
         if (typeof window !== 'undefined') {
           localStorage.setItem('ran_fitness_admin_session', JSON.stringify({
@@ -44,7 +43,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
         setError('Invalid username or password credentials.');
         setIsSubmitting(false);
       }
-    }, 800);
+    } catch (err: any) {
+      setError(err.message || 'Verification failed. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -148,10 +150,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                 {isSubmitting ? 'Verifying Credentials...' : 'Access Dashboard'}
               </button>
             </form>
-
-            <div className="mt-6 text-center text-[10px] text-zinc-500 font-mono">
-              Demo access: <strong className="text-zinc-600 dark:text-zinc-500">admin / RanFitness2026!</strong>
-            </div>
           </motion.div>
         </div>
       )}

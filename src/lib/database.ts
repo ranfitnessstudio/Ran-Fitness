@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { neon } from '@neondatabase/serverless';
+const bcrypt = typeof window === 'undefined' ? require('bcryptjs') : null;
 
 // Define TS Interfaces
 export interface WebsiteSettings {
@@ -191,7 +192,7 @@ const SEED_SETTINGS: WebsiteSettings = {
 };
 
 const SEED_SOCIALS: SocialLinks = {
-  instagram_url: "https://instagram.com/ranfitness_habsiguda",
+  instagram_url: "https://www.instagram.com/ranfitnessstudio/",
   whatsapp_number: "9666345644",
   facebook_url: "https://facebook.com/ranfitness",
   youtube_url: "https://youtube.com/@ranfitness",
@@ -207,7 +208,7 @@ const SEED_TRAINERS: Trainer[] = [
     specialization: "Powerlifting, Body Recomposition & Hypertrophy",
     quote: "Discipline beats motivation every single day. The work doesn't care how you feel.",
     image_url: "https://images.unsplash.com/photo-1567013127542-490d757e51fc?auto=format&fit=crop&q=80&w=600",
-    instagram_url: "https://instagram.com/ranfitness_habsiguda",
+    instagram_url: "https://www.instagram.com/ranfitnessstudio/",
     contact_number: "9666345644",
     badges: ["Certified Trainer", "Transformation Specialist"]
   },
@@ -219,7 +220,7 @@ const SEED_TRAINERS: Trainer[] = [
     specialization: "Olympic Lifting, Gymnastics & High-Intensity Conditioning",
     quote: "Your only limit is you. Break your mental barrier, the body will follow.",
     image_url: "https://images.unsplash.com/photo-1548690312-e3b507d8c110?auto=format&fit=crop&q=80&w=600",
-    instagram_url: "https://instagram.com/ranfitness_habsiguda",
+    instagram_url: "https://www.instagram.com/ranfitnessstudio/",
     contact_number: "9666345644",
     badges: ["CrossFit Coach", "Certified Trainer"]
   }
@@ -842,6 +843,50 @@ async function ensureDbInitialized() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS visitor_analytics (
+        id SERIAL PRIMARY KEY,
+        visitor_id TEXT NOT NULL,
+        page TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        visited_at TIMESTAMPTZ DEFAULT NOW(),
+        user_agent TEXT NOT NULL,
+        book_trial_clicks INT DEFAULT 0,
+        virtual_tour_opens INT DEFAULT 0,
+        trainer_card_clicks INT DEFAULT 0,
+        equipment_views INT DEFAULT 0
+      )
+    `;
+
+    await sql`
+      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS book_trial_clicks INT DEFAULT 0;
+      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS virtual_tour_opens INT DEFAULT 0;
+      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS trainer_card_clicks INT DEFAULT 0;
+      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS equipment_views INT DEFAULT 0;
+    `;
+
+    // Ensure unique constraint/index for upsert
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS visitor_analytics_visitor_session_idx ON visitor_analytics (visitor_id, session_id);
+    `;
+
+    // Ensure admin credentials table exists
+    await sql`
+      CREATE TABLE IF NOT EXISTS admin_credentials (
+        id INT PRIMARY KEY,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        last_updated TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    // Seed admin credentials if empty
+    const adminCount = await sql`SELECT COUNT(*)::int as count FROM admin_credentials`;
+    if (adminCount[0].count === 0) {
+      const defaultHash = bcrypt.hashSync('RanFitness2026!', 10);
+      await sql`INSERT INTO admin_credentials (id, username, password_hash) VALUES (1, 'admin', ${defaultHash})`;
+    }
 
     // Seed virtual_tour if empty
     const vtCount = await sql`SELECT COUNT(*)::int as count FROM virtual_tour`;
@@ -3130,5 +3175,159 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       return await sql`SELECT * FROM member_ai_chats WHERE member_id = ${memberId} ORDER BY created_at DESC LIMIT 20`;
     }
     return [];
+  },
+
+  async saveVisitorAnalytics(data: { visitorId: string; page: string; sessionId: string; userAgent: string; eventType?: 'book_trial_click' | 'virtual_tour_open' | 'trainer_card_click' | 'equipment_view' }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('saveVisitorAnalytics', [data]);
+      return res;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+
+      if (data.eventType) {
+        // UPSERT: insert row if it doesn't exist, then increment the event counter
+        await sql`
+          INSERT INTO visitor_analytics (visitor_id, page, session_id, user_agent)
+          VALUES (${data.visitorId}, ${data.page}, ${data.sessionId}, ${data.userAgent})
+          ON CONFLICT (visitor_id, session_id) DO NOTHING
+        `;
+
+        const columnMap: Record<string, string> = {
+          book_trial_click: 'book_trial_clicks',
+          virtual_tour_open: 'virtual_tour_opens',
+          trainer_card_click: 'trainer_card_clicks',
+          equipment_view: 'equipment_views'
+        };
+        const column = columnMap[data.eventType];
+
+        if (column === 'book_trial_clicks') {
+          const rows = await sql`UPDATE visitor_analytics SET book_trial_clicks = COALESCE(book_trial_clicks, 0) + 1 WHERE visitor_id = ${data.visitorId} AND session_id = ${data.sessionId} RETURNING *`;
+          return rows[0];
+        } else if (column === 'virtual_tour_opens') {
+          const rows = await sql`UPDATE visitor_analytics SET virtual_tour_opens = COALESCE(virtual_tour_opens, 0) + 1 WHERE visitor_id = ${data.visitorId} AND session_id = ${data.sessionId} RETURNING *`;
+          return rows[0];
+        } else if (column === 'trainer_card_clicks') {
+          const rows = await sql`UPDATE visitor_analytics SET trainer_card_clicks = COALESCE(trainer_card_clicks, 0) + 1 WHERE visitor_id = ${data.visitorId} AND session_id = ${data.sessionId} RETURNING *`;
+          return rows[0];
+        } else if (column === 'equipment_views') {
+          const rows = await sql`UPDATE visitor_analytics SET equipment_views = COALESCE(equipment_views, 0) + 1 WHERE visitor_id = ${data.visitorId} AND session_id = ${data.sessionId} RETURNING *`;
+          return rows[0];
+        }
+      }
+
+      // Default: plain page visit insert
+      const rows = await sql`
+        INSERT INTO visitor_analytics (visitor_id, page, session_id, user_agent)
+        VALUES (${data.visitorId}, ${data.page}, ${data.sessionId}, ${data.userAgent})
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async getVisitorAnalyticsStats(): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('getVisitorAnalyticsStats');
+      if (res !== null) return res;
+      return { totalVisitors: 120, todayVisitors: 15, weekVisitors: 84, returningVisitors: 42, conversionRate: 12.5, trialSubmissions: 15, bookTrialClicks: 8, virtualTourOpens: 23, trainerCardClicks: 14, equipmentViews: 31 };
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const totalVis = await sql`SELECT COUNT(DISTINCT visitor_id)::int as count FROM visitor_analytics`;
+      const todayVis = await sql`SELECT COUNT(DISTINCT visitor_id)::int as count FROM visitor_analytics WHERE visited_at >= NOW() - INTERVAL '1 day'`;
+      const weekVis = await sql`SELECT COUNT(DISTINCT visitor_id)::int as count FROM visitor_analytics WHERE visited_at >= NOW() - INTERVAL '7 days'`;
+      const returningVis = await sql`SELECT COUNT(DISTINCT visitor_id)::int as count FROM (SELECT visitor_id FROM visitor_analytics GROUP BY visitor_id HAVING COUNT(DISTINCT session_id) > 1) as t`;
+      const leadsCount = await sql`SELECT COUNT(*)::int as count FROM leads`;
+      const eventSums = await sql`SELECT COALESCE(SUM(book_trial_clicks), 0)::int as book_trial_clicks, COALESCE(SUM(virtual_tour_opens), 0)::int as virtual_tour_opens, COALESCE(SUM(trainer_card_clicks), 0)::int as trainer_card_clicks, COALESCE(SUM(equipment_views), 0)::int as equipment_views FROM visitor_analytics`;
+      
+      const total = totalVis[0].count || 0;
+      const subs = leadsCount[0].count || 0;
+      const rate = total > 0 ? Number(((subs / total) * 100).toFixed(1)) : 0.0;
+
+      return {
+        totalVisitors: total,
+        todayVisitors: todayVis[0].count || 0,
+        weekVisitors: weekVis[0].count || 0,
+        returningVisitors: returningVis[0].count || 0,
+        conversionRate: rate,
+        trialSubmissions: subs,
+        bookTrialClicks: eventSums[0].book_trial_clicks || 0,
+        virtualTourOpens: eventSums[0].virtual_tour_opens || 0,
+        trainerCardClicks: eventSums[0].trainer_card_clicks || 0,
+        equipmentViews: eventSums[0].equipment_views || 0
+      };
+    }
+    return { totalVisitors: 120, todayVisitors: 15, weekVisitors: 84, returningVisitors: 42, conversionRate: 12.5, trialSubmissions: 15, bookTrialClicks: 8, virtualTourOpens: 23, trainerCardClicks: 14, equipmentViews: 31 };
+  },
+
+  async verifyAdminPassword(usernameInput: string, passwordInput: string): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<boolean>('verifyAdminPassword', [usernameInput, passwordInput]);
+      return !!res;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM admin_credentials WHERE username = ${usernameInput} LIMIT 1`;
+      if (rows.length === 0) return false;
+      return await bcrypt.compare(passwordInput, rows[0].password_hash);
+    }
+    // Mock fallback
+    const mockCreds = getLocal('admin_credentials', { username: 'admin', password_hash: bcrypt.hashSync('RanFitness2026!', 10) });
+    if (usernameInput !== mockCreds.username) return false;
+    return await bcrypt.compare(passwordInput, mockCreds.password_hash);
+  },
+
+  async updateAdminPassword(currentPasswordInput: string, newPasswordInput: string): Promise<{ success: boolean; error?: string }> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<{ success: boolean; error?: string }>('updateAdminPassword', [currentPasswordInput, newPasswordInput]);
+      return res || { success: false, error: 'Network error or proxy failure.' };
+    }
+
+    const isCurrentValid = await this.verifyAdminPassword('admin', currentPasswordInput);
+    if (!isCurrentValid) {
+      return { success: false, error: 'Incorrect current password.' };
+    }
+
+    const newHash = await bcrypt.hash(newPasswordInput, 10);
+
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      await sql`
+        UPDATE admin_credentials 
+        SET password_hash = ${newHash}, last_updated = NOW() 
+        WHERE username = 'admin'
+      `;
+      return { success: true };
+    }
+
+    // Mock fallback
+    setLocal('admin_credentials', {
+      username: 'admin',
+      password_hash: newHash,
+      last_updated: new Date().toISOString()
+    });
+    return { success: true };
+  },
+
+  async getAdminLastUpdated(): Promise<string | null> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<string | null>('getAdminLastUpdated');
+      return res;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT last_updated FROM admin_credentials WHERE username = 'admin' LIMIT 1`;
+      if (rows.length === 0) return null;
+      return rows[0].last_updated ? new Date(rows[0].last_updated).toISOString() : null;
+    }
+    const mockCreds = getLocal('admin_credentials', { username: 'admin', password_hash: bcrypt.hashSync('RanFitness2026!', 10), last_updated: null });
+    return mockCreds.last_updated || null;
   }
 };

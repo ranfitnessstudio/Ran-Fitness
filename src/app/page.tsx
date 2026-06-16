@@ -1,7 +1,7 @@
 /* eslint-disable */
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Dumbbell, 
@@ -24,7 +24,8 @@ import {
   Star,
   Activity,
   Smile,
-  Play
+  Play,
+  Plus
 } from 'lucide-react';
 
 import { db, Trainer, Equipment, MembershipPlan, Transformation, WebsiteSettings, SocialLinks, GymEvent, VirtualTour } from '@/lib/database';
@@ -117,6 +118,8 @@ export default function Home() {
   const [events, setEvents] = useState<GymEvent[]>([]);
   const [virtualTour, setVirtualTour] = useState<VirtualTour | null>(null);
   const [tourModalOpen, setTourModalOpen] = useState(false);
+  const [footerVisible, setFooterVisible] = useState(false);
+  const footerRef = useRef<HTMLElement>(null);
 
   // Navigation & UI control state
   const [activeSection, setActiveSection] = useState('home');
@@ -253,9 +256,71 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Footer visibility observer for floating bar
+  useEffect(() => {
+    if (!footerRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setFooterVisible(entry.isIntersecting),
+      { threshold: 0.1 }
+    );
+    observer.observe(footerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Visitor tracking
+  useEffect(() => {
+    const trackVisit = async () => {
+      try {
+        let visitorId = localStorage.getItem('ran_visitor_id');
+        if (!visitorId) {
+          visitorId = crypto.randomUUID();
+          localStorage.setItem('ran_visitor_id', visitorId);
+        }
+        let sessionId = sessionStorage.getItem('ran_session_id');
+        if (!sessionId) {
+          sessionId = crypto.randomUUID();
+          sessionStorage.setItem('ran_session_id', sessionId);
+        }
+        await fetch('/api/analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            visitorId,
+            page: '/',
+            sessionId,
+            userAgent: navigator.userAgent
+          })
+        });
+      } catch (e) {
+        // Silent fail for analytics
+      }
+    };
+    trackVisit();
+  }, []);
+
   const openBooking = (goal = '') => {
     setBookingGoal(goal);
     setBookingOpen(true);
+    trackEvent('book_trial_click');
+  };
+
+  // Analytics event tracker
+  const trackEvent = async (eventType: string) => {
+    try {
+      const visitorId = localStorage.getItem('ran_visitor_id') || '';
+      const sessionId = sessionStorage.getItem('ran_session_id') || '';
+      await fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorId,
+          page: '/',
+          sessionId,
+          userAgent: navigator.userAgent,
+          eventType
+        })
+      });
+    } catch (e) { /* silent */ }
   };
 
   // Filter equipment based on tabs
@@ -331,7 +396,7 @@ export default function Home() {
               </div>
 
               {/* Desktop Menu */}
-              <nav className="hidden lg:flex items-center gap-6 font-mono text-xs uppercase tracking-widest">
+              <nav className="hidden lg:flex items-center gap-10 font-mono text-xs uppercase tracking-widest">
                 {['about', 'equipment', 'trainers', 'plans', 'transformations', 'contact'].map((item) => (
                   <button
                     key={item}
@@ -659,7 +724,7 @@ export default function Home() {
           </section>
 
           {/* Why Choose RAN Section */}
-          <section id="about" className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden transition-colors duration-300">
+          <section id="about" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
               <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
@@ -827,7 +892,7 @@ export default function Home() {
                       whileInView={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.7 }}
                       viewport={{ once: true }}
-                      onClick={() => setTourModalOpen(true)}
+                      onClick={() => { setTourModalOpen(true); trackEvent('virtual_tour_open'); }}
                       className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 bg-black cursor-pointer shadow-2xl group transition-all duration-500 hover:border-yellow-400/30 hover:shadow-[0_0_30px_rgba(250,204,21,0.2)]"
                     >
                       {/* Thumbnail Image */}
@@ -902,7 +967,7 @@ export default function Home() {
           )}
 
           {/* Equipment Showcase ("Powered by Aerofit") */}
-          <section id="equipment" className="py-24 bg-zinc-100/50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
+          <section id="equipment" className="py-28 bg-zinc-100/50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
               <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-6">
@@ -944,7 +1009,7 @@ export default function Home() {
           </section>
 
           {/* Meet Your Coaches */}
-          <section id="trainers" className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+          <section id="trainers" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
               <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
@@ -958,7 +1023,7 @@ export default function Home() {
               </div>
 
               {/* Staggered Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 max-w-5xl mx-auto justify-items-center">
                 {trainers.map((trainer, idx) => (
                   <motion.div
                     key={trainer.id}
@@ -966,7 +1031,7 @@ export default function Home() {
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: idx * 0.12 }}
                     viewport={{ once: true }}
-                    onClick={() => setSelectedTrainer(trainer)}
+                    onClick={() => { setSelectedTrainer(trainer); trackEvent('trainer_card_click'); }}
                     className="relative rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/30 overflow-hidden cursor-pointer group hover:border-yellow-400/40 dark:hover:border-yellow-400/40 hover:-translate-y-1 transition-all duration-300 shadow-xl flex flex-col justify-between"
                   >
                     {/* Picture */}
@@ -998,6 +1063,24 @@ export default function Home() {
                           {badge}
                         </span>
                       ))}
+                    </div>
+                  </motion.div>
+                ))}
+                {trainers.length < 3 && Array.from({ length: 3 - trainers.length }).map((_, idx) => (
+                  <motion.div
+                    key={`placeholder-${idx}`}
+                    initial={{ opacity: 0, y: 35 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: (trainers.length + idx) * 0.12 }}
+                    viewport={{ once: true }}
+                    className="relative rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/20 overflow-hidden flex flex-col justify-center items-center min-h-[380px] w-full"
+                  >
+                    <div className="text-center space-y-3 p-6">
+                      <div className="w-16 h-16 rounded-full bg-yellow-400/10 flex items-center justify-center mx-auto">
+                        <Plus size={24} className="text-yellow-400" />
+                      </div>
+                      <h4 className="font-display text-lg font-black italic text-zinc-400 dark:text-zinc-600 uppercase">Coming Soon</h4>
+                      <p className="text-zinc-400 dark:text-zinc-600 text-xs">New coach joining the team</p>
                     </div>
                   </motion.div>
                 ))}
@@ -1095,7 +1178,7 @@ export default function Home() {
           </section>
 
           {/* Transformation Wall */}
-          <section id="transformations" className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-100/50 dark:bg-zinc-950/40 relative overflow-hidden transition-colors duration-300">
+          <section id="transformations" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-100/50 dark:bg-zinc-950/40 relative overflow-hidden transition-colors duration-300">
             {/* Background Image Overlay */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.06] dark:opacity-[0.09] mix-blend-luminosity grayscale bg-cover bg-center" style={{ backgroundImage: `url('/images/vascular_gym_muscles.png')` }} />
             
@@ -1196,7 +1279,7 @@ export default function Home() {
           </section>
 
           {/* Membership Plans */}
-          <section id="plans" className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+          <section id="plans" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
               <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
@@ -1287,7 +1370,7 @@ export default function Home() {
 
           {/* D. Event Board Section (Challenges & Zumba events) */}
           {events.length > 0 && (
-            <section className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+            <section className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
               <div className="max-w-7xl mx-auto px-4 sm:px-6">
                 
                 <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
@@ -1566,7 +1649,7 @@ export default function Home() {
           </section>
 
           {/* Premium Apple-style Footer */}
-          <footer className="bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 py-16 text-xs text-zinc-500 font-sans relative overflow-hidden transition-colors duration-300">
+          <footer ref={footerRef} className="bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 py-16 text-xs text-zinc-500 font-sans relative overflow-hidden transition-colors duration-300">
             {/* Background Image Overlay */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.04] dark:opacity-[0.06] mix-blend-luminosity grayscale bg-cover bg-center" style={{ backgroundImage: `url('/images/vascular_gym_muscles.png')` }} />
             
@@ -1634,9 +1717,9 @@ export default function Home() {
           </footer>
 
           {/* Smart Floating Action Bar */}
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] bg-zinc-950/95 backdrop-blur-md border border-zinc-900 rounded-full py-2.5 px-6 flex items-center gap-6 shadow-2xl">
+          <div className={`fixed left-1/2 -translate-x-1/2 z-[1000] bg-zinc-950/95 backdrop-blur-md border border-zinc-900 rounded-full py-2.5 px-6 flex items-center gap-6 shadow-2xl transition-all duration-500 ${footerVisible || bookingOpen || tourModalOpen ? 'opacity-0 pointer-events-none translate-y-10 scale-90' : 'opacity-100'} bottom-5 md:bottom-10`}>
             <a
-              href="https://instagram.com/ranfitness_habsiguda"
+              href="https://www.instagram.com/ranfitnessstudio/"
               target="_blank"
               rel="noopener noreferrer"
               className="text-white hover:text-yellow-400 transition-colors"
