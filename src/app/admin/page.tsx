@@ -608,7 +608,7 @@ export default function AdminDashboard() {
 
   const handleForceLogoutAll = () => {
     localStorage.removeItem('ran_fitness_admin_session');
-    document.cookie = "ran_admin_session=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "ran_admin_session=; path=/; max-age=0; SameSite=Strict; Secure";
     showToastMessage('✅ All sessions terminated. Logging out...', 'success');
     setTimeout(() => {
       window.location.href = '/';
@@ -745,7 +745,7 @@ export default function AdminDashboard() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('ran_fitness_admin_session');
       // Set the edge-friendly cookie as cleared
-      document.cookie = "ran_admin_session=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "ran_admin_session=; path=/; max-age=0; SameSite=Strict; Secure";
     }
     router.push('/');
   };

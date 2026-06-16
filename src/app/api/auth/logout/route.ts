@@ -10,7 +10,7 @@ export async function POST() {
   );
   response.headers.append(
     'Set-Cookie',
-    'ran_admin_session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly'
+    'ran_admin_session=; Path=/; Max-Age=0; SameSite=Strict; HttpOnly; Secure'
   );
 
   return response;
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   );
   response.headers.append(
     'Set-Cookie',
-    'ran_admin_session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly'
+    'ran_admin_session=; Path=/; Max-Age=0; SameSite=Strict; HttpOnly; Secure'
   );
 
   return response;

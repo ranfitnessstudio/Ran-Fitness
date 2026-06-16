@@ -1,16 +1,38 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifyToken } from './lib/auth-token';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Protect Admin CMS
-  if (pathname.startsWith('/admin')) {
+  // Protect Admin CMS and sensitive API routes
+  if (
+    pathname.startsWith('/admin') || 
+    pathname.startsWith('/api/db') || 
+    pathname.startsWith('/api/analytics') || 
+    pathname.startsWith('/api/ai-status')
+  ) {
     const adminSession = request.cookies.get('ran_admin_session');
-    if (!adminSession || adminSession.value !== 'valid') {
+    let isValid = false;
+    
+    if (adminSession?.value) {
+      const username = await verifyToken(adminSession.value);
+      if (username) {
+        isValid = true;
+      }
+    }
+
+    if (!isValid) {
+      // For API calls, return JSON with 401 Unauthorized status
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized CMS operation' },
+          { status: 401 }
+        );
+      }
+      
       const url = request.nextUrl.clone();
       url.pathname = '/';
-      // Pass query param to show login if desired, or just redirect
       return NextResponse.redirect(url);
     }
   }
@@ -29,5 +51,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/member-dashboard/:path*'],
+  matcher: ['/admin/:path*', '/member-dashboard/:path*', '/api/db', '/api/analytics', '/api/ai-status'],
 };

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
 import bcrypt from 'bcryptjs';
+import { signToken } from '@/lib/auth-token';
 
 export async function POST(request: Request) {
   try {
@@ -33,14 +34,15 @@ export async function POST(request: Request) {
     }
 
     // Successful login - set the cookie
+    const token = await signToken(username, Date.now() + 3600000 * 2);
     const response = NextResponse.json({
       success: true,
-      token: 'admin_token_' + Date.now()
+      token
     });
 
     response.headers.set(
       'Set-Cookie',
-      'ran_admin_session=valid; Path=/; Max-Age=7200; SameSite=Lax; HttpOnly'
+      `ran_admin_session=${token}; Path=/; Max-Age=7200; SameSite=Strict; HttpOnly; Secure`
     );
 
     return response;
