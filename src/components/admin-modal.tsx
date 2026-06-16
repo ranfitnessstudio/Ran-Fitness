@@ -18,33 +18,37 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
-    // Simple robust admin check
-    // In production, this can be validated via an API endpoint checking bcrypt hashes.
-    // Predefined admin keys: admin / RanFitness2026!
-    setTimeout(() => {
-      if (username === 'admin' && password === 'RanFitness2026!') {
-        // Successful login
+    try {
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('ran_fitness_admin_session', JSON.stringify({
-            token: 'mock_jwt_token_' + Date.now(),
-            expiresAt: Date.now() + 3600000 * 2 // 2 hours expiration
+            token: data.token,
+            username: username,
+            expiresAt: Date.now() + 3600000 * 2 // 2 hours
           }));
-          // Set the edge-friendly cookie as well
-          document.cookie = "ran_admin_session=valid; path=/; max-age=7200; SameSite=Lax";
         }
         setIsSubmitting(false);
         onClose();
         router.push('/admin');
       } else {
-        setError('Invalid username or password credentials.');
+        setError(data.error || 'Invalid username or password credentials.');
         setIsSubmitting(false);
       }
-    }, 800);
+    } catch (err: any) {
+      setError('Connection error. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -150,7 +154,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
             </form>
 
             <div className="mt-6 text-center text-[10px] text-zinc-500 font-mono">
-              Demo access: <strong className="text-zinc-600 dark:text-zinc-500">admin / RanFitness2026!</strong>
+              Demo access: <strong className="text-zinc-600 dark:text-zinc-500">admin / RanFitness2026!</strong> (Changeable via Security Panel)
             </div>
           </motion.div>
         </div>

@@ -865,6 +865,22 @@ async function ensureDbInitialized() {
       ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS equipment_views INT DEFAULT 0;
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS admin_credentials (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    const adminCount = await sql`SELECT COUNT(*)::int as count FROM admin_credentials`;
+    if (adminCount[0].count === 0) {
+      const bcrypt = require('bcryptjs');
+      const hash = bcrypt.hashSync('RanFitness2026!', 10);
+      await sql`INSERT INTO admin_credentials (username, password_hash) VALUES ('admin', ${hash})`;
+    }
+
     // Seed virtual_tour if empty
     const vtCount = await sql`SELECT COUNT(*)::int as count FROM virtual_tour`;
     if (vtCount[0].count === 0) {
@@ -3239,5 +3255,89 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       };
     }
     return { totalVisitors: 120, todayVisitors: 15, weekVisitors: 84, returningVisitors: 42, conversionRate: 12.5, trialSubmissions: 15, bookTrialClicks: 8, virtualTourOpens: 23, trainerCardClicks: 14, equipmentViews: 31 };
+  },
+
+  async getAdminCredentials(username: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('getAdminCredentials', [username]);
+      if (res !== null) return res;
+      const list = getLocal('admin_credentials', [{ username: 'admin', password_hash: require('bcryptjs').hashSync('RanFitness2026!', 10), updated_at: new Date().toISOString() }]);
+      return list.find((u: any) => u.username === username) || null;
+    }
+
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM admin_credentials WHERE username = ${username} LIMIT 1`;
+      if (rows.length > 0) return rows[0];
+    } else {
+      const list = [{ username: 'admin', password_hash: require('bcryptjs').hashSync('RanFitness2026!', 10), updated_at: new Date().toISOString() }];
+      return list.find((u: any) => u.username === username) || null;
+    }
+    return null;
+  },
+
+  async updateAdminPassword(username: string, newPasswordHash: string): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<boolean>('updateAdminPassword', [username, newPasswordHash]);
+      if (res !== null) return res;
+      const list = getLocal('admin_credentials', [{ username: 'admin', password_hash: '', updated_at: '' }]);
+      const index = list.findIndex((u: any) => u.username === username);
+      if (index !== -1) {
+        list[index].password_hash = newPasswordHash;
+        list[index].updated_at = new Date().toISOString();
+        setLocal('admin_credentials', list);
+        return true;
+      }
+      return false;
+    }
+
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const result = await sql`
+        UPDATE admin_credentials 
+        SET password_hash = ${newPasswordHash}, updated_at = NOW() 
+        WHERE username = ${username}
+        RETURNING *
+      `;
+      return result.length > 0;
+    } else {
+      return true;
+    }
+  },
+
+  async updateAdminUsername(currentUsername: string, newUsername: string): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<boolean>('updateAdminUsername', [currentUsername, newUsername]);
+      if (res !== null) return res;
+      const list = getLocal('admin_credentials', [{ username: 'admin', password_hash: '', updated_at: '' }]);
+      const index = list.findIndex((u: any) => u.username === currentUsername);
+      if (index !== -1) {
+        list[index].username = newUsername;
+        list[index].updated_at = new Date().toISOString();
+        setLocal('admin_credentials', list);
+        return true;
+      }
+      return false;
+    }
+
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const exists = await sql`SELECT 1 FROM admin_credentials WHERE username = ${newUsername} LIMIT 1`;
+      if (exists.length > 0) {
+        throw new Error('Username already exists');
+      }
+      const result = await sql`
+        UPDATE admin_credentials 
+        SET username = ${newUsername}, updated_at = NOW() 
+        WHERE username = ${currentUsername}
+        RETURNING *
+      `;
+      return result.length > 0;
+    } else {
+      return true;
+    }
   }
 };

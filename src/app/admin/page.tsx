@@ -127,6 +127,18 @@ export default function AdminDashboard() {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [progressMemberId, setProgressMemberId] = useState<string | null>(null);
   const [progressLogList, setProgressLogList] = useState<MemberProgress[]>([]);
+
+  // Admin Security States
+  const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'security'>('general');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [secCurrentUsername, setSecCurrentUsername] = useState('admin');
+  const [secNewUsername, setSecNewUsername] = useState('');
+  const [showSecPassword, setShowSecPassword] = useState(false);
+  const [updatingSecPassword, setUpdatingSecPassword] = useState(false);
+  const [updatingSecUsername, setUpdatingSecUsername] = useState(false);
+  const [lastPasswordChangeDate, setLastPasswordChangeDate] = useState<string>('');
   
   // Progress logging form fields
   const [pWeight, setPWeight] = useState('');
@@ -484,6 +496,169 @@ export default function AdminDashboard() {
       }
     }
     router.push('/');
+  };
+
+  const getPasswordStrength = (pass: string) => {
+    if (!pass) return '';
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+    
+    if (score <= 1) return 'Weak';
+    if (score <= 3) return 'Medium';
+    return 'Strong';
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showToastMessage('❌ All fields are required', 'error');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showToastMessage('❌ New password must be at least 8 characters long', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToastMessage('❌ Confirm password does not match new password', 'error');
+      return;
+    }
+
+    setUpdatingSecPassword(true);
+    try {
+      const creds = await db.getAdminCredentials(secCurrentUsername);
+      if (!creds) {
+        showToastMessage('❌ Admin user not found', 'error');
+        setUpdatingSecPassword(false);
+        return;
+      }
+
+      const bcrypt = require('bcryptjs');
+      const match = await bcrypt.compare(currentPassword, creds.password_hash);
+      if (!match) {
+        showToastMessage('❌ Incorrect Current Password', 'error');
+        setUpdatingSecPassword(false);
+        return;
+      }
+
+      const newHash = bcrypt.hashSync(newPassword, 10);
+      const success = await db.updateAdminPassword(secCurrentUsername, newHash);
+      if (success) {
+        showToastMessage('✅ Password Updated Successfully', 'success');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        const updatedCreds = await db.getAdminCredentials(secCurrentUsername);
+        if (updatedCreds) {
+          setLastPasswordChangeDate(new Date(updatedCreds.updated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
+        }
+      } else {
+        showToastMessage('❌ Failed to update password', 'error');
+      }
+    } catch (err: any) {
+      showToastMessage(`❌ Error: ${err.message || 'Unknown error occurred'}`, 'error');
+    } finally {
+      setUpdatingSecPassword(false);
+    }
+  };
+
+  const handleUpdateUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secNewUsername) {
+      showToastMessage('❌ New username is required', 'error');
+      return;
+    }
+    if (secNewUsername.length < 4) {
+      showToastMessage('❌ Username must be at least 4 characters long', 'error');
+      return;
+    }
+    if (secNewUsername === secCurrentUsername) {
+      showToastMessage('❌ New username is same as current username', 'error');
+      return;
+    }
+
+    setUpdatingSecUsername(true);
+    try {
+      const success = await db.updateAdminUsername(secCurrentUsername, secNewUsername);
+      if (success) {
+        showToastMessage('✅ Username Updated Successfully', 'success');
+        const sessionStr = localStorage.getItem('ran_fitness_admin_session');
+        if (sessionStr) {
+          const parsed = JSON.parse(sessionStr);
+          parsed.username = secNewUsername;
+          localStorage.setItem('ran_fitness_admin_session', JSON.stringify(parsed));
+        }
+        setSecCurrentUsername(secNewUsername);
+        setSecNewUsername('');
+        const updatedCreds = await db.getAdminCredentials(secNewUsername);
+        if (updatedCreds) {
+          setLastPasswordChangeDate(new Date(updatedCreds.updated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
+        }
+      } else {
+        showToastMessage('❌ Failed to update username', 'error');
+      }
+    } catch (err: any) {
+      showToastMessage(`❌ Error: ${err.message || 'Username already exists or database error'}`, 'error');
+    } finally {
+      setUpdatingSecUsername(false);
+    }
+  };
+
+  const handleForceLogoutAll = () => {
+    localStorage.removeItem('ran_fitness_admin_session');
+    document.cookie = "ran_admin_session=; path=/; max-age=0; SameSite=Lax";
+    showToastMessage('✅ All sessions terminated. Logging out...', 'success');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 1500);
+  };
+
+  const handleResetAdminCredentials = async () => {
+    if (!confirm('Are you sure you want to reset admin credentials to default (admin / RanFitness2026!)?')) {
+      return;
+    }
+    try {
+      const bcrypt = require('bcryptjs');
+      const hash = bcrypt.hashSync('RanFitness2026!', 10);
+      
+      if (secCurrentUsername !== 'admin') {
+        try {
+          await db.updateAdminUsername(secCurrentUsername, 'admin');
+        } catch {}
+      }
+      
+      const success = await db.updateAdminPassword('admin', hash);
+      if (success) {
+        showToastMessage('✅ Credentials reset successfully! Log out or log in again.', 'success');
+        setSecCurrentUsername('admin');
+        const sessionStr = localStorage.getItem('ran_fitness_admin_session');
+        if (sessionStr) {
+          const parsed = JSON.parse(sessionStr);
+          parsed.username = 'admin';
+          localStorage.setItem('ran_fitness_admin_session', JSON.stringify(parsed));
+        }
+        const updatedCreds = await db.getAdminCredentials('admin');
+        if (updatedCreds) {
+          setLastPasswordChangeDate(new Date(updatedCreds.updated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
+        }
+      }
+    } catch (err: any) {
+      showToastMessage(`❌ Reset failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleGenerateStrongPassword = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
+    let pass = '';
+    for (let i = 0; i < 16; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(pass);
+    setConfirmPassword(pass);
+    setShowSecPassword(true);
+    showToastMessage('✅ Strong Password Generated!', 'success');
   };
 
   const loadAllData = async () => {
@@ -2315,137 +2490,333 @@ ${xmlRows}
           )}
 
           {/* CONFIGURATION SETTINGS TAB */}
+          {/* CONFIGURATION SETTINGS TAB */}
           {activeTab === 'settings' && settings && (
-            <form onSubmit={updateSettingsSubmit} className="max-w-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 space-y-6">
-              
-              <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest">Ribbons & Notification Banners</h3>
-              <div className="grid grid-cols-2 gap-6 bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-900">
-                {/* Offer ribbon toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="offerToggle"
-                      checked={settings.offer_banner_active}
-                      onChange={(e) => setSettings({ ...settings, offer_banner_active: e.target.checked })}
-                      className="rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-yellow-500 dark:text-yellow-400 focus:ring-0"
-                    />
-                    <label htmlFor="offerToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Offer Banner Active</label>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Offer Announcement text"
-                    value={settings.offer_banner_text}
-                    onChange={(e) => setSettings({ ...settings, offer_banner_text: e.target.value })}
-                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-2 text-xs focus:outline-none text-zinc-900 dark:text-white"
-                  />
-                </div>
-
-                {/* Announcement toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="announceToggle"
-                      checked={settings.announcement_active}
-                      onChange={(e) => setSettings({ ...settings, announcement_active: e.target.checked })}
-                      className="rounded bg-white dark:bg-zinc-950 border border-zinc-800 text-yellow-500 dark:text-yellow-400 focus:ring-0"
-                    />
-                    <label htmlFor="announceToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Holiday Alert Active</label>
-                  </div>
-                  <textarea
-                    rows={2}
-                    placeholder="Announcement details"
-                    value={settings.announcement_text}
-                    onChange={(e) => setSettings({ ...settings, announcement_text: e.target.value })}
-                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs focus:outline-none text-zinc-900 dark:text-white"
-                  />
-                </div>
+            <div className="space-y-6 max-w-2xl">
+              {/* Sub tabs navigation */}
+              <div className="flex border-b border-zinc-200 dark:border-zinc-900 pb-px">
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('general')}
+                  className={`px-6 py-2.5 text-xs font-mono font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                    settingsSubTab === 'general'
+                      ? 'border-yellow-400 text-yellow-500 font-black'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                  }`}
+                >
+                  ⚙️ General Config
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('security')}
+                  className={`px-6 py-2.5 text-xs font-mono font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                    settingsSubTab === 'security'
+                      ? 'border-yellow-400 text-yellow-500 font-black'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                  }`}
+                >
+                  🔐 Security Settings
+                </button>
               </div>
 
-              <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest pt-4">General Homepage Content</h3>
-              
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Title Header</label>
-                  <input
-                    type="text"
-                    value={settings.hero_title}
-                    onChange={(e) => setSettings({ ...settings, hero_title: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
+              {settingsSubTab === 'general' ? (
+                <form onSubmit={updateSettingsSubmit} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 space-y-6">
+                  <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest">Ribbons & Notification Banners</h3>
+                  <div className="grid grid-cols-2 gap-6 bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-900">
+                    {/* Offer ribbon toggle */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="offerToggle"
+                          checked={settings.offer_banner_active}
+                          onChange={(e) => setSettings({ ...settings, offer_banner_active: e.target.checked })}
+                          className="rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-yellow-500 dark:text-yellow-400 focus:ring-0"
+                        />
+                        <label htmlFor="offerToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Offer Banner Active</label>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Offer Announcement text"
+                        value={settings.offer_banner_text}
+                        onChange={(e) => setSettings({ ...settings, offer_banner_text: e.target.value })}
+                        className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-2 text-xs focus:outline-none text-zinc-900 dark:text-white"
+                      />
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Subtitle</label>
-                  <input
-                    type="text"
-                    value={settings.hero_subtitle}
-                    onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">About Text</label>
-                  <textarea
-                    rows={4}
-                    value={settings.about_text}
-                    onChange={(e) => setSettings({ ...settings, about_text: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Address</label>
-                  <input
-                    type="text"
-                    value={settings.contact_address}
-                    onChange={(e) => setSettings({ ...settings, contact_address: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Phone</label>
-                    <input
-                      type="text"
-                      value={settings.contact_phone}
-                      onChange={(e) => setSettings({ ...settings, contact_phone: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                    />
+                    {/* Announcement toggle */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="announceToggle"
+                          checked={settings.announcement_active}
+                          onChange={(e) => setSettings({ ...settings, announcement_active: e.target.checked })}
+                          className="rounded bg-white dark:bg-zinc-950 border border-zinc-850 text-yellow-500 dark:text-yellow-400 focus:ring-0"
+                        />
+                        <label htmlFor="announceToggle" className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">Holiday Alert Active</label>
+                      </div>
+                      <textarea
+                        rows={2}
+                        placeholder="Announcement details"
+                        value={settings.announcement_text}
+                        onChange={(e) => setSettings({ ...settings, announcement_text: e.target.value })}
+                        className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 px-3 py-1.5 text-xs focus:outline-none text-zinc-900 dark:text-white"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Business Operating Hours</label>
-                    <input
-                      type="text"
-                      value={settings.business_hours}
-                      onChange={(e) => setSettings({ ...settings, business_hours: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                    />
+                  <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest pt-4">General Homepage Content</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Title Header</label>
+                      <input
+                        type="text"
+                        value={settings.hero_title}
+                        onChange={(e) => setSettings({ ...settings, hero_title: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Hero Subtitle</label>
+                      <input
+                        type="text"
+                        value={settings.hero_subtitle}
+                        onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">About Text</label>
+                      <textarea
+                        rows={4}
+                        value={settings.about_text}
+                        onChange={(e) => setSettings({ ...settings, about_text: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Address</label>
+                      <input
+                        type="text"
+                        value={settings.contact_address}
+                        onChange={(e) => setSettings({ ...settings, contact_address: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Contact Phone</label>
+                        <input
+                          type="text"
+                          value={settings.contact_phone}
+                          onChange={(e) => setSettings({ ...settings, contact_phone: e.target.value })}
+                          className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Business Operating Hours</label>
+                        <input
+                          type="text"
+                          value={settings.business_hours}
+                          onChange={(e) => setSettings({ ...settings, business_hours: e.target.value })}
+                          className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Google Maps Embed Link</label>
+                      <textarea
+                        rows={2}
+                        value={settings.google_maps_link}
+                        onChange={(e) => setSettings({ ...settings, google_maps_link: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg bg-yellow-400 text-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-yellow-300 font-mono cursor-pointer"
+                  >
+                    Save Settings Configuration
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  {/* Admin Password Update Card */}
+                  <div className="bg-white dark:bg-zinc-950 p-6 rounded-xl border border-zinc-200 dark:border-zinc-900 space-y-4 transition-colors duration-300">
+                    <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest flex items-center gap-2">
+                      🔐 Admin Security Credentials
+                    </h3>
+                    
+                    <form onSubmit={handleChangePassword} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5 col-span-2">
+                          <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Current Password</label>
+                          <input
+                            type={showSecPassword ? 'text' : 'password'}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Enter current password"
+                            className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">New Password</label>
+                          <input
+                            type={showSecPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Min 8 characters"
+                            className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Confirm Password</label>
+                          <input
+                            type={showSecPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Confirm new password"
+                            className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {newPassword && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-mono text-zinc-400">Password Strength:</span>
+                          <span className={`text-[10px] font-mono font-bold uppercase ${
+                            getPasswordStrength(newPassword) === 'Weak' 
+                              ? 'text-red-500' 
+                              : getPasswordStrength(newPassword) === 'Medium' 
+                                ? 'text-yellow-500' 
+                                : 'text-green-500'
+                          }`}>
+                            {getPasswordStrength(newPassword)}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowSecPassword(!showSecPassword)}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-650 dark:text-zinc-450 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+                          >
+                            {showSecPassword ? '🙈 Hide' : '👁️ Show'} Passwords
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleGenerateStrongPassword}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono font-bold uppercase tracking-wider text-yellow-600 dark:text-yellow-400 hover:border-yellow-400 cursor-pointer"
+                          >
+                            🔑 Generate Password
+                          </button>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={updatingSecPassword}
+                          className="px-4 py-2 rounded-lg bg-yellow-400 text-black text-[10px] font-mono font-bold uppercase tracking-widest hover:bg-yellow-300 disabled:opacity-50 cursor-pointer animate-none"
+                        >
+                          {updatingSecPassword ? 'Updating...' : 'Change Password'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Username Management Card */}
+                  <div className="bg-white dark:bg-zinc-950 p-6 rounded-xl border border-zinc-200 dark:border-zinc-900 space-y-4 transition-colors duration-300">
+                    <h3 className="font-display font-black italic text-sm text-yellow-500 dark:text-yellow-400 uppercase tracking-widest">
+                      👤 Username Management
+                    </h3>
+
+                    <form onSubmit={handleUpdateUsername} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Current Username</label>
+                          <input
+                            type="text"
+                            value={secCurrentUsername}
+                            disabled
+                            className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 px-3 py-2 text-xs text-zinc-400 cursor-not-allowed font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">New Username</label>
+                          <input
+                            type="text"
+                            value={secNewUsername}
+                            onChange={(e) => setSecNewUsername(e.target.value)}
+                            placeholder="Min 4 characters"
+                            className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={updatingSecUsername}
+                          className="px-4 py-2 rounded-lg bg-yellow-400 text-black text-[10px] font-mono font-bold uppercase tracking-widest hover:bg-yellow-300 disabled:opacity-50 cursor-pointer"
+                        >
+                          {updatingSecUsername ? 'Updating...' : 'Update Username'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Security Center Meta & Recovery */}
+                  <div className="bg-white dark:bg-zinc-950 p-6 rounded-xl border border-zinc-200 dark:border-zinc-900 space-y-4 transition-colors duration-300">
+                    <h3 className="font-display font-black italic text-sm text-red-500 dark:text-red-400 uppercase tracking-widest">
+                      🛡️ Security Center & Recovery
+                    </h3>
+
+                    <div className="text-[11px] font-mono text-zinc-500 space-y-1.5 bg-zinc-50 dark:bg-zinc-900/20 p-4 border border-zinc-100 dark:border-zinc-900 rounded-lg">
+                      <div className="flex justify-between">
+                        <span>Current Admin Profile:</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{secCurrentUsername}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Last Password Update:</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{lastPasswordChangeDate || 'Never / Seeding'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleForceLogoutAll}
+                        className="px-4 py-2 rounded-lg bg-red-950/40 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-950/60 text-[9px] font-mono font-bold uppercase tracking-widest transition-all cursor-pointer"
+                      >
+                        ⚠️ Force Logout All Sessions
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetAdminCredentials}
+                        className="px-4 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-[9px] font-mono font-bold uppercase tracking-widest transition-all cursor-pointer"
+                      >
+                        🔄 Reset Admin Credentials
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-bold font-mono">Google Maps Embed Link</label>
-                  <textarea
-                    rows={2}
-                    value={settings.google_maps_link}
-                    onChange={(e) => setSettings({ ...settings, google_maps_link: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-yellow-400 text-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-yellow-300 font-mono cursor-pointer"
-              >
-                Save Settings Configuration
-              </button>
-            </form>
+              )}
+            </div>
           )}
 
           {/* AI MONITORING TAB */}
