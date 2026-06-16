@@ -389,14 +389,17 @@ export default function Home() {
           <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
             scrolled ? 'bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-900 py-3' : 'bg-transparent py-5'
           }`}>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+            <div className="max-w-[1600px] mx-auto px-4 lg:px-8 flex items-center justify-between w-full">
               
-              <div onClick={() => handleNavClick('home')} className="cursor-pointer flex items-center">
-                <Logo variant="full" />
+              {/* LEFT: Logo Section */}
+              <div className="lg:flex-1 flex justify-start items-center shrink-0 min-w-max">
+                <div onClick={() => handleNavClick('home')} className="cursor-pointer flex items-center shrink-0">
+                  <Logo variant="full" />
+                </div>
               </div>
 
-              {/* Desktop Menu */}
-              <nav className="hidden lg:flex items-center gap-10 font-mono text-xs uppercase tracking-widest">
+              {/* CENTER: Navigation Links */}
+              <nav className="hidden lg:flex items-center gap-4 xl:gap-6 2xl:gap-8 font-mono text-xs uppercase tracking-widest lg:mx-20 xl:mx-28 2xl:mx-32 shrink-0">
                 {['about', 'equipment', 'trainers', 'plans', 'transformations', 'contact'].map((item) => (
                   <button
                     key={item}
@@ -410,31 +413,35 @@ export default function Home() {
                 ))}
               </nav>
 
-              <div className="hidden sm:flex items-center gap-4">
-                <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
-                <button
-                  onClick={() => setMemberLoginOpen(true)}
-                  className="rounded-full border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 dark:hover:border-yellow-400 px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider text-zinc-650 dark:text-zinc-300 hover:text-yellow-500 dark:hover:text-yellow-400 transition-all bg-transparent"
-                >
-                  Member Portal
-                </button>
-                <button
-                  onClick={() => openBooking('General Trial')}
-                  className="rounded-full bg-yellow-400 text-black px-5 py-2 text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 hover:scale-105 active:scale-95 transition-all animate-heartpulse"
-                >
-                  Book Free Trial
-                </button>
-              </div>
+              {/* RIGHT: Actions / Theme Toggle */}
+              <div className="flex items-center justify-end lg:flex-1 gap-3 xl:gap-4 shrink-0 min-w-max">
+                {/* Desktop Actions */}
+                <div className="hidden lg:flex items-center gap-3 xl:gap-4">
+                  <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
+                  <button
+                    onClick={() => setMemberLoginOpen(true)}
+                    className="rounded-full border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 dark:hover:border-yellow-400 px-4 xl:px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider text-zinc-650 dark:text-zinc-300 hover:text-yellow-500 dark:hover:text-yellow-400 transition-all bg-transparent cursor-pointer whitespace-nowrap"
+                  >
+                    Member Portal
+                  </button>
+                  <button
+                    onClick={() => openBooking('General Trial')}
+                    className="rounded-full bg-yellow-400 text-black px-4 xl:px-5 py-2 text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 hover:scale-105 active:scale-95 transition-all animate-heartpulse cursor-pointer whitespace-nowrap"
+                  >
+                    Book Free Trial
+                  </button>
+                </div>
 
-              {/* Mobile Menu Toggle */}
-              <div className="flex items-center gap-3 lg:hidden">
-                <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
-                <button
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-zinc-900 dark:text-white hover:text-yellow-400 transition-colors"
-                >
-                  {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
+                {/* Mobile Actions (Mobile menu toggle & Theme toggle) */}
+                <div className="flex items-center gap-3 lg:hidden">
+                  <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
+                  <button
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="text-zinc-900 dark:text-white hover:text-yellow-400 transition-colors"
+                  >
+                    {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                  </button>
+                </div>
               </div>
 
             </div>

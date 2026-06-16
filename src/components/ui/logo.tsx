@@ -33,7 +33,7 @@ export const Logo: React.FC<LogoProps> = ({
     >
       {/* Circular Brand Icon (Cropped perfectly by scale-[1.12]) */}
       <div 
-        className="relative w-[46px] h-[46px] sm:w-[54px] sm:h-[54px] lg:w-[64px] lg:h-[64px] flex-shrink-0 rounded-full overflow-hidden border border-yellow-400/20 bg-black"
+        className="relative w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] lg:w-[52px] lg:h-[52px] xl:w-[60px] xl:h-[60px] 2xl:w-[64px] 2xl:h-[64px] flex-shrink-0 rounded-full overflow-hidden border border-yellow-400/20 bg-black"
         style={iconStyle}
       >
         <Image
@@ -45,9 +45,9 @@ export const Logo: React.FC<LogoProps> = ({
         />
       </div>
 
-      {/* Horizontal Wordmark (15-20% smaller) */}
+      {/* Horizontal Wordmark (Responsive sizing) */}
       <div 
-        className="font-display font-black italic tracking-widest uppercase text-[20px] sm:text-2xl md:text-3xl lg:text-[34px]"
+        className="font-display font-black italic tracking-widest uppercase text-[18px] sm:text-xl md:text-2xl lg:text-[24px] xl:text-[28px] 2xl:text-[34px]"
         style={fontStyle}
       >
         {/* Light mode: RAN (black), - (yellow), FITNESS (black) */}
