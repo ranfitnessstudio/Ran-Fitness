@@ -161,7 +161,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
 
         {/* Video Area: Centered, fits screen */}
         <div 
-          className="flex-1 flex items-center justify-center relative overflow-hidden my-4" 
+          className="flex-1 w-full relative overflow-hidden my-4 rounded-lg shadow-2xl" 
           onClick={togglePlay}
         >
           {/* Loading Skeleton */}
@@ -240,13 +240,9 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
             onEnded={() => setPlaying(false)}
             style={{
               transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
-              objectFit: isPortrait ? 'contain' : 'cover',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: '100%',
-              height: '100%'
+              objectFit: isPortrait ? 'contain' : 'cover'
             }}
-            className="z-10 transition-transform duration-300 rounded-lg shadow-2xl"
+            className="absolute inset-0 w-full h-full z-10 transition-transform duration-300 rounded-lg"
           />
         </div>
 
