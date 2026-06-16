@@ -937,26 +937,55 @@ export default function AdminDashboard() {
 
                 return (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-5 space-y-2">
-                        <span className="text-[10px] text-zinc-500 uppercase font-mono block">Total Registered</span>
-                        <div className="text-2xl font-black italic text-yellow-500 dark:text-yellow-400 font-display">{totalMembersCount} Members</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                      {/* Card 1: Total Registered */}
+                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 relative overflow-hidden group hover:border-yellow-400/30 transition-all duration-300 shadow-md flex flex-col justify-between min-h-[110px]">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500" />
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] text-zinc-500 uppercase font-mono font-bold tracking-wider">Total Registered</span>
+                          <Users size={16} className="text-yellow-500 opacity-60 group-hover:scale-110 transition-transform duration-300" />
+                        </div>
+                        <div className="text-2xl font-black italic text-yellow-500 dark:text-yellow-400 font-display mt-2">{totalMembersCount} Members</div>
                       </div>
-                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-5 space-y-2">
-                        <span className="text-[10px] text-zinc-500 uppercase font-mono block">Active Plan Holders</span>
-                        <div className="text-2xl font-black italic text-green-500 font-display">{activeMembersCount} Active</div>
+
+                      {/* Card 2: Active Plan Holders */}
+                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 relative overflow-hidden group hover:border-green-500/30 transition-all duration-300 shadow-md flex flex-col justify-between min-h-[110px]">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] text-zinc-500 uppercase font-mono font-bold tracking-wider">Active Plan Holders</span>
+                          <CheckCircle size={16} className="text-green-500 opacity-60 group-hover:scale-110 transition-transform duration-300" />
+                        </div>
+                        <div className="text-2xl font-black italic text-green-500 font-display mt-2">{activeMembersCount} Active</div>
                       </div>
-                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-5 space-y-2">
-                        <span className="text-[10px] text-zinc-500 uppercase font-mono block">Expired Plans</span>
-                        <div className="text-2xl font-black italic text-red-500 font-display">{expiredMembersCount} Expired</div>
+
+                      {/* Card 3: Expired Plans */}
+                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 relative overflow-hidden group hover:border-red-500/30 transition-all duration-300 shadow-md flex flex-col justify-between min-h-[110px]">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] text-zinc-500 uppercase font-mono font-bold tracking-wider">Expired Plans</span>
+                          <AlertTriangle size={16} className="text-red-500 opacity-60 group-hover:scale-110 transition-transform duration-300" />
+                        </div>
+                        <div className="text-2xl font-black italic text-red-500 font-display mt-2">{expiredMembersCount} Expired</div>
                       </div>
-                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-5 space-y-2 col-span-1">
-                        <span className="text-[10px] text-zinc-500 uppercase font-mono block">Est. Monthly Revenue</span>
-                        <div className="text-2xl font-black italic text-yellow-400 font-display">₹{Math.round(monthlyRevenue).toLocaleString('en-IN')}</div>
+
+                      {/* Card 4: Est. Monthly Revenue */}
+                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 relative overflow-hidden group hover:border-yellow-400/30 transition-all duration-300 shadow-md flex flex-col justify-between min-h-[110px]">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400" />
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] text-zinc-500 uppercase font-mono font-bold tracking-wider">Est. Monthly Revenue</span>
+                          <TrendingUp size={16} className="text-yellow-400 opacity-60 group-hover:scale-110 transition-transform duration-300" />
+                        </div>
+                        <div className="text-2xl font-black italic text-yellow-400 font-display mt-2">₹{Math.round(monthlyRevenue).toLocaleString('en-IN')}</div>
                       </div>
-                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-5 space-y-2 col-span-1">
-                        <span className="text-[10px] text-zinc-500 uppercase font-mono block">Est. Annual Billing</span>
-                        <div className="text-2xl font-black italic text-white font-display">₹{Math.round(yearlyRevenue).toLocaleString('en-IN')}</div>
+
+                      {/* Card 5: Est. Annual Billing */}
+                      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 relative overflow-hidden group hover:border-zinc-400/30 transition-all duration-300 shadow-md flex flex-col justify-between min-h-[110px]">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-zinc-400 dark:bg-zinc-500" />
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] text-zinc-500 uppercase font-mono font-bold tracking-wider">Est. Annual Billing</span>
+                          <Activity size={16} className="text-zinc-400 opacity-60 group-hover:scale-110 transition-transform duration-300" />
+                        </div>
+                        <div className="text-2xl font-black italic text-zinc-800 dark:text-white font-display mt-2">₹{Math.round(yearlyRevenue).toLocaleString('en-IN')}</div>
                       </div>
                     </div>
 

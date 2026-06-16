@@ -948,13 +948,13 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-4 bg-zinc-950/40 border border-zinc-900 rounded-xl space-y-2">
-                      <p className="text-[10px] text-zinc-500 font-mono">No fitness target configured yet.</p>
+                    <div className="relative overflow-hidden rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 p-5 text-center flex flex-col items-center justify-center gap-2.5 group hover:border-yellow-400/20 transition-all duration-300">
+                      <p className="text-[10px] text-zinc-400 font-mono">No fitness target configured yet.</p>
                       <button 
                         onClick={() => setEditGoalOpen(true)}
-                        className="bg-yellow-400 text-black font-mono font-bold uppercase text-[9px] px-3 py-1.5 rounded"
+                        className="bg-yellow-400 hover:bg-yellow-500 text-black font-mono font-bold uppercase text-[9px] px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-md shadow-yellow-400/10"
                       >
-                        Configure Target Now
+                        Set Goal 🎯
                       </button>
                     </div>
                   )}
@@ -1097,8 +1097,11 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                         <p className="text-zinc-300 font-sans text-xs leading-normal pt-1">{notesList[0].note}</p>
                       </div>
                     ) : (
-                      <div className="text-center py-4 bg-zinc-950/40 border border-zinc-900 rounded-xl text-zinc-550 italic text-[10px] font-mono">
-                        No advisory notes from your trainer yet. Keep working hard!
+                      <div className="relative overflow-hidden rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 p-5 text-center flex flex-col items-center justify-center gap-2 group hover:border-yellow-400/20 transition-all duration-300">
+                        <div className="w-8 h-8 rounded-full bg-zinc-900/50 border border-zinc-850 flex items-center justify-center text-zinc-500 group-hover:text-yellow-400 transition-colors duration-300">
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                        <p className="text-[10px] text-zinc-500 font-mono">No trainer advisory notes logged yet. Keep pushing hard!</p>
                       </div>
                     )}
                   </section>
@@ -1191,7 +1194,10 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                   <div className="space-y-3">
                     <h4 className="text-[9px] uppercase tracking-widest text-zinc-500 font-mono font-bold">Photo History Comparison</h4>
                     {photosList.length === 0 ? (
-                      <div className="text-center py-6 text-zinc-600 italic font-mono text-[10px]">No progress photos uploaded yet.</div>
+                      <div className="relative overflow-hidden rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 p-6 text-center flex flex-col items-center justify-center gap-2 group hover:border-yellow-400/20 transition-all duration-300">
+                        <Camera className="w-5 h-5 text-zinc-650 group-hover:text-yellow-400 transition-colors duration-300" />
+                        <span className="text-zinc-500 font-mono text-[10px]">No progress photos uploaded yet. Track your journey!</span>
+                      </div>
                     ) : (
                       <div className="space-y-4">
                         {photosList.map((p, idx) => (
@@ -1412,9 +1418,15 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
 
                     </div>
                   ) : (
-                    <div className="text-center py-10 bg-zinc-950/40 border border-zinc-900 rounded-xl">
-                      <span className="text-3xl block mb-2">🥗</span>
-                      <p className="text-xs text-zinc-500 font-mono">No diet plan has been mapped to your account by the trainers yet.</p>
+                    <div className="relative overflow-hidden rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 p-8 text-center flex flex-col items-center justify-center gap-3 group hover:border-yellow-400/20 transition-all duration-300">
+                      <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/[0.02] to-transparent pointer-events-none" />
+                      <div className="w-12 h-12 rounded-full bg-zinc-900/50 border border-zinc-850 flex items-center justify-center text-zinc-500 group-hover:text-yellow-400 group-hover:border-yellow-400/30 transition-all duration-300">
+                        <Utensils className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div className="space-y-1 max-w-xs">
+                        <h4 className="font-mono text-xs uppercase font-bold text-zinc-300">No Diet Assigned</h4>
+                        <p className="text-[11px] text-zinc-500 font-sans leading-relaxed">Your personalized macros, calorie targets, and meal breakdown will appear here once Vikram maps your plan.</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1429,10 +1441,16 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                     <MessageSquare size={14} className="text-yellow-400" /> Trainer Advisory Notes
                   </h3>
 
-                  {notesList.length === 0 ? (
-                    <div className="text-center py-10 bg-zinc-950/40 border border-zinc-900 rounded-xl">
-                      <span className="text-3xl block mb-2">💬</span>
-                      <p className="text-xs text-zinc-500 font-mono">No trainer notes logged yet. Keep pushing hard!</p>
+                   {notesList.length === 0 ? (
+                    <div className="relative overflow-hidden rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 p-8 text-center flex flex-col items-center justify-center gap-3 group hover:border-yellow-400/20 transition-all duration-300">
+                      <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/[0.02] to-transparent pointer-events-none" />
+                      <div className="w-12 h-12 rounded-full bg-zinc-900/50 border border-zinc-850 flex items-center justify-center text-zinc-500 group-hover:text-yellow-400 group-hover:border-yellow-400/30 transition-all duration-300">
+                        <MessageSquare className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1 max-w-xs">
+                        <h4 className="font-mono text-xs uppercase font-bold text-zinc-300">No Advisory Notes</h4>
+                        <p className="text-[11px] text-zinc-500 font-sans leading-relaxed">Trainer feedback, performance reviews, and adjustment notes will show up in this feed.</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-4 font-mono text-[10px]">

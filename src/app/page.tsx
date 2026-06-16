@@ -612,18 +612,19 @@ export default function Home() {
                 {settings.hero_subtitle}
               </motion.div>
 
-              <motion.h1
-                initial={{ y: 30, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="font-display text-5xl md:text-8xl font-black italic tracking-tighter text-zinc-900 dark:text-white leading-none"
-              >
+              <h1 className="font-display text-5xl md:text-8xl font-black italic tracking-tighter text-zinc-900 dark:text-white leading-none flex flex-wrap justify-center overflow-hidden">
                 {settings.hero_title.split(' ').map((word, idx) => (
-                  <span key={idx} className={idx === 3 ? 'text-yellow-400 block sm:inline font-black' : ''}>
-                    {word}{' '}
-                  </span>
+                  <motion.span
+                    key={idx}
+                    initial={{ y: 60, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.8, delay: 0.2 + idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                    className={word.toLowerCase().includes('fitness') || word.toLowerCase().includes('ran') ? 'text-yellow-400 font-black mr-2.5 md:mr-4' : 'mr-2.5 md:mr-4'}
+                  >
+                    {word}
+                  </motion.span>
                 ))}
-              </motion.h1>
+              </h1>
 
               <motion.p
                 initial={{ y: 20, opacity: 0 }}
@@ -1835,11 +1836,20 @@ const EquipmentCard: React.FC<{ eq: Equipment }> = ({ eq }) => {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       whileHover={{ y: -6, scale: 1.02 }}
-      className="rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/10 p-6 flex flex-col justify-between hover:border-yellow-400/30 dark:hover:border-yellow-400/30 hover:shadow-[0_0_20px_rgba(250,204,21,0.15)] transition-all duration-300 group shadow-lg"
+      className="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/10 p-6 flex flex-col justify-between hover:border-yellow-400/30 dark:hover:border-yellow-400/30 hover:shadow-[0_0_30px_rgba(250,204,21,0.2)] transition-all duration-300 group shadow-lg min-h-[340px]"
     >
+      {/* Premium glass reflection overlay */}
+      <div className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none" />
+
       <div className="space-y-4">
-        <div className="h-28 flex items-center justify-center p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900/50 group-hover:border-yellow-400/10 transition-colors">
-          <EquipmentSvg name={getIconName(eq.name)} className="text-zinc-400 dark:text-zinc-600 group-hover:text-yellow-400 transition-colors" isHovered={hovered} />
+        <div className="h-28 flex items-center justify-center p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900/50 group-hover:border-yellow-400/10 transition-colors relative overflow-hidden">
+          <motion.div
+            animate={hovered ? { y: [0, -4, 0] } : {}}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="w-16 h-16 flex items-center justify-center"
+          >
+            <EquipmentSvg name={getIconName(eq.name)} className="w-full h-full text-zinc-400 dark:text-zinc-600 group-hover:text-yellow-400 transition-colors" isHovered={hovered} />
+          </motion.div>
         </div>
 
         <div>

@@ -21,7 +21,9 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
   const [duration, setDuration] = useState('0:00');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
-  const [rotate90, setRotate90] = useState(false);
+  const [rotationIndex, setRotationIndex] = useState(0);
+  const rotationValues = [0, -90, 0, 90] as const;
+  const rotation = rotationValues[rotationIndex];
   const [videoFailed, setVideoFailed] = useState(false);
   const [loadingVideo, setLoadingVideo] = useState(true);
   const [showControls, setShowControls] = useState(true);
@@ -37,10 +39,21 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
 
   useEffect(() => {
     setIsPortrait(false);
-    setRotate90(false);
+    setRotationIndex(0);
     setVideoFailed(false);
     setLoadingVideo(true);
   }, [videoUrl]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      console.log({
+        width: videoRef.current.videoWidth,
+        height: videoRef.current.videoHeight,
+        isPortrait,
+        rotation
+      });
+    }
+  }, [rotation, isPortrait]);
 
   useEffect(() => {
     if (isOpen && videoRef.current) {
@@ -92,9 +105,12 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
       if (videoWidth > 0 && videoHeight > 0) {
         const portrait = videoHeight > videoWidth;
         setIsPortrait(portrait);
-        if (portrait && typeof window !== 'undefined' && window.innerWidth > window.innerHeight) {
-          setRotate90(true);
-        }
+        console.log({
+          width: videoWidth,
+          height: videoHeight,
+          isPortrait: portrait,
+          rotation: 0
+        });
       }
       setLoadingVideo(false);
     }
@@ -147,7 +163,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
         {isPortrait && (
           <div className="absolute top-6 left-6 z-50 bg-yellow-400 text-black text-[10px] font-mono font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full shadow-2xl flex items-center gap-1.5 animate-pulse">
             <span className="w-1.5 h-1.5 bg-black rounded-full" />
-            {rotate90 ? 'Rotated Portrait Tour' : 'Vertical Mobile Tour'}
+            <span>📱 Portrait Video Detected</span>
           </div>
         )}
 
@@ -161,7 +177,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
 
         {/* Video Frame */}
         <div 
-          className={`flex-1 flex items-center justify-center relative overflow-hidden ${isPortrait && !rotate90 ? 'py-16' : ''}`} 
+          className="flex-1 flex items-center justify-center relative overflow-hidden" 
           onClick={togglePlay}
         >
           {/* Loading Skeleton */}
@@ -208,6 +224,9 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
                 loop
                 playsInline
                 className="w-full h-full object-cover blur-[80px] scale-110"
+                style={{
+                  transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none'
+                }}
                 ref={(el) => {
                   if (el && !videoFailed) {
                     if (playing) el.play().catch(() => {});
@@ -221,7 +240,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
             </div>
           )}
 
-          {isPortrait && !rotate90 ? (
+          {isPortrait ? (
             /* Premium Phone frame style container for Portrait Video */
             <div className="relative z-10 max-h-full h-full aspect-[9/16] rounded-[40px] border-[10px] border-zinc-800 bg-black shadow-2xl shadow-black/80 overflow-hidden flex items-center justify-center">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 h-4 w-32 bg-zinc-800 rounded-b-2xl z-20 flex items-center justify-center">
@@ -242,7 +261,15 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
                 onPlaying={() => setLoadingVideo(false)}
                 onError={() => { setVideoFailed(true); setLoadingVideo(false); }}
                 onEnded={() => setPlaying(false)}
-                className="w-full h-full object-contain"
+                style={{
+                  transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
+                  objectFit: 'contain',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  width: '100%',
+                  height: '100%'
+                }}
+                className="w-full h-full object-contain transition-transform duration-300"
               />
             </div>
           ) : (
@@ -264,12 +291,12 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
                 onError={() => { setVideoFailed(true); setLoadingVideo(false); }}
                 onEnded={() => setPlaying(false)}
                 style={{
-                  transform: rotate90 ? 'rotate(90deg)' : 'none',
+                  transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
                   objectFit: 'contain',
                   maxWidth: '100%',
                   maxHeight: '100%',
-                  height: rotate90 ? '100vw' : '100%',
-                  width: rotate90 ? '100vh' : '100%'
+                  width: '100%',
+                  height: '100%'
                 }}
                 className="z-10 transition-transform duration-300"
               />
@@ -319,15 +346,13 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
 
             {/* Right controls */}
             <div className="flex items-center gap-3">
-              {isPortrait && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setRotate90(!rotate90); }}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-yellow-400 text-[9px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all border border-zinc-700 cursor-pointer"
-                  title="Rotate Video 90 Degrees"
-                >
-                  🔄 Rotate
-                </button>
-              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); setRotationIndex(prev => (prev + 1) % 4); }}
+                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-yellow-400 text-[9px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all border border-zinc-700 cursor-pointer flex items-center gap-1"
+                title="Rotate Video"
+              >
+                🔄 Rotate {rotation !== 0 ? `(${rotation}°)` : ''}
+              </button>
               {onBookTrial && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onClose(); onBookTrial(); }}

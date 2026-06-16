@@ -268,3 +268,10 @@
   will-change: transform;
 }
 
+/* Accessibility Focus States for Keyboard Navigation */
+*:focus-visible {
+  outline: 3px solid #facc15 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 5px rgba(250, 204, 21, 0.2) !important;
+}
+
