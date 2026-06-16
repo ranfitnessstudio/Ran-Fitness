@@ -20,11 +20,8 @@ export const metadata: Metadata = {
   keywords: 'Best Gym in Habsiguda, CrossFit Gym Habsiguda, Gym Near Me, Fitness Center Habsiguda, Zumba Classes Habsiguda, Ran Fitness Hyderabad',
   metadataBase: new URL('https://ranfitness.com'),
   icons: {
-    icon: [
-      { url: "/favicon.ico" },
-      { url: "/icon.png", sizes: "32x32", type: "image/png" }
-    ],
-    apple: "/apple-icon.png"
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png"
   },
   openGraph: {
     title: 'RAN Fitness | Premium Gym & CrossFit Habsiguda',

@@ -1,6 +1,5 @@
 /* eslint-disable */
 import { neon } from '@neondatabase/serverless';
-const bcrypt = typeof window === 'undefined' ? require('bcryptjs') : null;
 
 // Define TS Interfaces
 export interface WebsiteSettings {
@@ -835,7 +834,6 @@ async function ensureDbInitialized() {
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS meal_schedule TEXT`;
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS compliance_pct INT DEFAULT 100`;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS virtual_tour (
         id INT PRIMARY KEY DEFAULT 1,
         video_url TEXT NOT NULL DEFAULT '',
@@ -865,28 +863,6 @@ async function ensureDbInitialized() {
       ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS trainer_card_clicks INT DEFAULT 0;
       ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS equipment_views INT DEFAULT 0;
     `;
-
-    // Ensure unique constraint/index for upsert
-    await sql`
-      CREATE UNIQUE INDEX IF NOT EXISTS visitor_analytics_visitor_session_idx ON visitor_analytics (visitor_id, session_id);
-    `;
-
-    // Ensure admin credentials table exists
-    await sql`
-      CREATE TABLE IF NOT EXISTS admin_credentials (
-        id INT PRIMARY KEY,
-        username TEXT NOT NULL,
-        password_hash TEXT NOT NULL,
-        last_updated TIMESTAMPTZ DEFAULT NOW()
-      )
-    `;
-
-    // Seed admin credentials if empty
-    const adminCount = await sql`SELECT COUNT(*)::int as count FROM admin_credentials`;
-    if (adminCount[0].count === 0) {
-      const defaultHash = bcrypt.hashSync('RanFitness2026!', 10);
-      await sql`INSERT INTO admin_credentials (id, username, password_hash) VALUES (1, 'admin', ${defaultHash})`;
-    }
 
     // Seed virtual_tour if empty
     const vtCount = await sql`SELECT COUNT(*)::int as count FROM virtual_tour`;
@@ -3262,72 +3238,5 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       };
     }
     return { totalVisitors: 120, todayVisitors: 15, weekVisitors: 84, returningVisitors: 42, conversionRate: 12.5, trialSubmissions: 15, bookTrialClicks: 8, virtualTourOpens: 23, trainerCardClicks: 14, equipmentViews: 31 };
-  },
-
-  async verifyAdminPassword(usernameInput: string, passwordInput: string): Promise<boolean> {
-    if (typeof window !== 'undefined') {
-      const res = await clientProxy<boolean>('verifyAdminPassword', [usernameInput, passwordInput]);
-      return !!res;
-    }
-    if (databaseUrl) {
-      await ensureDbInitialized();
-      const sql = neon(databaseUrl);
-      const rows = await sql`SELECT * FROM admin_credentials WHERE username = ${usernameInput} LIMIT 1`;
-      if (rows.length === 0) return false;
-      return await bcrypt.compare(passwordInput, rows[0].password_hash);
-    }
-    // Mock fallback
-    const mockCreds = getLocal('admin_credentials', { username: 'admin', password_hash: bcrypt.hashSync('RanFitness2026!', 10) });
-    if (usernameInput !== mockCreds.username) return false;
-    return await bcrypt.compare(passwordInput, mockCreds.password_hash);
-  },
-
-  async updateAdminPassword(currentPasswordInput: string, newPasswordInput: string): Promise<{ success: boolean; error?: string }> {
-    if (typeof window !== 'undefined') {
-      const res = await clientProxy<{ success: boolean; error?: string }>('updateAdminPassword', [currentPasswordInput, newPasswordInput]);
-      return res || { success: false, error: 'Network error or proxy failure.' };
-    }
-
-    const isCurrentValid = await this.verifyAdminPassword('admin', currentPasswordInput);
-    if (!isCurrentValid) {
-      return { success: false, error: 'Incorrect current password.' };
-    }
-
-    const newHash = await bcrypt.hash(newPasswordInput, 10);
-
-    if (databaseUrl) {
-      await ensureDbInitialized();
-      const sql = neon(databaseUrl);
-      await sql`
-        UPDATE admin_credentials 
-        SET password_hash = ${newHash}, last_updated = NOW() 
-        WHERE username = 'admin'
-      `;
-      return { success: true };
-    }
-
-    // Mock fallback
-    setLocal('admin_credentials', {
-      username: 'admin',
-      password_hash: newHash,
-      last_updated: new Date().toISOString()
-    });
-    return { success: true };
-  },
-
-  async getAdminLastUpdated(): Promise<string | null> {
-    if (typeof window !== 'undefined') {
-      const res = await clientProxy<string | null>('getAdminLastUpdated');
-      return res;
-    }
-    if (databaseUrl) {
-      await ensureDbInitialized();
-      const sql = neon(databaseUrl);
-      const rows = await sql`SELECT last_updated FROM admin_credentials WHERE username = 'admin' LIMIT 1`;
-      if (rows.length === 0) return null;
-      return rows[0].last_updated ? new Date(rows[0].last_updated).toISOString() : null;
-    }
-    const mockCreds = getLocal('admin_credentials', { username: 'admin', password_hash: bcrypt.hashSync('RanFitness2026!', 10), last_updated: null });
-    return mockCreds.last_updated || null;
   }
 };
