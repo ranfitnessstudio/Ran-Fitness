@@ -828,14 +828,14 @@ export default function Home() {
                       transition={{ duration: 0.7 }}
                       viewport={{ once: true }}
                       onClick={() => setTourModalOpen(true)}
-                      className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 bg-black cursor-pointer shadow-2xl group transition-all duration-500 hover:border-yellow-400/30"
+                      className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 bg-black cursor-pointer shadow-2xl group transition-all duration-500 hover:border-yellow-400/30 hover:shadow-[0_0_30px_rgba(250,204,21,0.2)]"
                     >
                       {/* Thumbnail Image */}
                       {virtualTour.thumbnail_url ? (
                         <img
                           src={virtualTour.thumbnail_url}
-                          alt="RAN Fitness Gym Tour Preview"
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          alt="EXPLORE OUR FACILITY"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
                           onError={(e) => {
                             (e.target as HTMLElement).style.display = 'none';
                           }}
@@ -845,7 +845,7 @@ export default function Home() {
                       )}
 
                       {/* Ambient Dark Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/35 group-hover:via-black/10 transition-colors duration-500" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/40 group-hover:via-black/25 transition-colors duration-500" />
 
                       {/* Centered Glass Play Button with Rotating Orbit Ring */}
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -861,19 +861,16 @@ export default function Home() {
                       </div>
 
                       {/* Content Overlay */}
-                      <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end text-left">
-                        <div className="space-y-1">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-yellow-400 text-black shadow-lg">
-                            <span className="h-1.5 w-1.5 rounded-full bg-black animate-pulse" />
-                            FACILITY TOUR
-                          </span>
-                          <h3 className="font-display text-lg md:text-xl font-black italic uppercase text-white mt-1.5 drop-shadow-md">
-                            Walk Through RAN Fitness (360° Walkthrough)
-                          </h3>
-                        </div>
-                        <span className="hidden sm:inline-block text-[10px] font-mono text-zinc-400 uppercase tracking-widest bg-black/40 px-3 py-1.5 rounded border border-zinc-800 backdrop-blur-sm">
-                          HD Video Tour
+                      <div className="absolute bottom-6 left-6 right-6 flex flex-col justify-end text-left space-y-1">
+                        <span className="text-[10px] font-mono font-bold tracking-widest text-yellow-400 uppercase">
+                          EXPLORE OUR FACILITY
                         </span>
+                        <h3 className="font-display text-2xl md:text-3xl font-black italic uppercase text-white drop-shadow-md">
+                          ▶ WATCH 360° TOUR
+                        </h3>
+                        <p className="text-zinc-350 text-xs font-sans">
+                          See the gym before your visit
+                        </p>
                       </div>
                     </motion.div>
 
@@ -1636,26 +1633,13 @@ export default function Home() {
             </div>
           </footer>
 
-          {/* G. Mobile-Only Emergency Fixed call button (☎ Call Now) */}
-          <div className="sm:hidden fixed bottom-6 left-6 z-[1000]">
-            <motion.a
-              href="tel:9666345644"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="flex h-14 px-5 items-center justify-center gap-2 rounded-full bg-green-500 hover:bg-green-600 text-white font-black italic uppercase tracking-wider text-xs shadow-2xl"
-            >
-              <Phone size={16} className="fill-current" />
-              ☎ CALL NOW
-            </motion.a>
-          </div>
-
           {/* Smart Floating Action Bar */}
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] bg-white/85 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-900 rounded-full py-2.5 px-6 flex items-center gap-6 shadow-2xl transition-colors duration-300">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] bg-zinc-950/95 backdrop-blur-md border border-zinc-900 rounded-full py-2.5 px-6 flex items-center gap-6 shadow-2xl">
             <a
               href="https://instagram.com/ranfitness_habsiguda"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-zinc-400 hover:text-yellow-400 transition-colors"
+              className="text-white hover:text-yellow-400 transition-colors"
               aria-label="Instagram profile"
             >
               <Instagram size={18} />
@@ -1664,7 +1648,7 @@ export default function Home() {
               href="https://wa.me/919666345644?text=Hi%20RAN%20Fitness%2C%20I%20would%20like%20to%20inquire%20about%20your%20membership%20plans."
               target="_blank"
               rel="noopener noreferrer"
-              className="text-zinc-400 hover:text-yellow-400 transition-colors"
+              className="text-white hover:text-yellow-400 transition-colors"
               aria-label="WhatsApp chat"
             >
               <svg className="w-[18px] h-[18px] fill-current" viewBox="0 0 24 24">
@@ -1673,7 +1657,7 @@ export default function Home() {
             </a>
             <a
               href="tel:9666345644"
-              className="text-zinc-400 hover:text-yellow-400 transition-colors"
+              className="text-white hover:text-yellow-400 transition-colors"
               aria-label="Phone call"
             >
               <Phone size={18} />
@@ -1681,7 +1665,7 @@ export default function Home() {
             <div className="h-4 w-[1px] bg-zinc-800" />
             <button
               onClick={() => openBooking('Floating Action Bar')}
-              className="rounded-full bg-yellow-400 text-black px-4 py-1.5 text-[10px] font-black italic uppercase tracking-wider hover:bg-yellow-300 transition-colors"
+              className="rounded-full bg-yellow-400 text-black px-4 py-1.5 text-[10px] font-black italic uppercase tracking-wider hover:bg-yellow-300 transition-colors cursor-pointer"
             >
               BOOK TRIAL
             </button>
