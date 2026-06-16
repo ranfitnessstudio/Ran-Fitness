@@ -135,119 +135,114 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95">
-      {/* Backdrop */}
-      <div className="absolute inset-0" onClick={onClose} />
+    <div 
+      ref={containerRef}
+      className="fixed inset-0 z-[9999] bg-black select-none overflow-hidden"
+      onMouseMove={handleMouseMove}
+    >
+      {/* Clickable video backdrop wrapper */}
+      <div className="absolute inset-0 z-0 cursor-pointer" onClick={togglePlay}>
+        {/* Blurred Background Video */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 opacity-25">
+          <video
+            src={videoUrl}
+            muted
+            loop
+            playsInline
+            className="w-full h-full object-cover blur-[80px] scale-110"
+            style={{
+              transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none'
+            }}
+            ref={(el) => {
+              if (el && !videoFailed) {
+                if (playing) el.play().catch(() => {});
+                else el.pause();
+                if (Math.abs(el.currentTime - (videoRef.current?.currentTime || 0)) > 0.5) {
+                  el.currentTime = videoRef.current?.currentTime || 0;
+                }
+              }
+            }}
+          />
+        </div>
 
-      {/* Modal content */}
-      <div
-        ref={containerRef}
-        className="relative w-full h-full md:w-[95vw] md:h-[90vh] md:mx-auto md:my-auto flex flex-col justify-between select-none z-10 p-3 md:p-6"
-        onMouseMove={handleMouseMove}
-      >
+        {/* Main Video Element */}
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          muted={muted}
+          playsInline
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onLoadStart={() => { setLoadingVideo(true); setVideoFailed(false); }}
+          onCanPlay={() => setLoadingVideo(false)}
+          onWaiting={() => setLoadingVideo(true)}
+          onPlaying={() => setLoadingVideo(false)}
+          onError={() => { setVideoFailed(true); setLoadingVideo(false); }}
+          onEnded={() => setPlaying(false)}
+          style={{
+            transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none'
+          }}
+          className={`absolute inset-0 w-full h-full z-10 transition-transform duration-300 ${
+            isPortrait ? 'object-contain' : 'object-cover'
+          }`}
+        />
+      </div>
+
+      {/* Loading Skeleton */}
+      {loadingVideo && !videoFailed && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950/80 gap-3 pointer-events-none">
+          <div className="h-10 w-10 rounded-full border-2 border-yellow-400/20 border-t-yellow-400 animate-spin" />
+          <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Buffering video tour...</span>
+        </div>
+      )}
+
+      {/* Error / Failed state */}
+      {videoFailed && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 text-2xl">
+            ⚠️
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-display font-bold uppercase text-zinc-200">Video Failed to Load</h4>
+            <p className="text-zinc-500 text-xs max-w-sm">The video tour could not be loaded. Please verify connection and retry.</p>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setVideoFailed(false);
+              setLoadingVideo(true);
+              if (videoRef.current) {
+                videoRef.current.load();
+                videoRef.current.play().catch(() => {});
+              }
+            }}
+            className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-[10px] font-mono font-bold uppercase tracking-widest transition-all cursor-pointer"
+          >
+            Retry Loading
+          </button>
+        </div>
+      )}
+
+      {/* Overlay UI - floats on top of the fullscreen video */}
+      <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-4 md:p-8">
         {/* Header bar: Top Left Title, Top Right Close */}
-        <div className={`flex justify-between items-center z-50 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          <div className="text-yellow-400 font-display font-black italic tracking-widest text-xs md:text-sm uppercase">
+        <div className={`flex justify-between items-center pointer-events-auto transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="text-yellow-400 font-display font-black italic tracking-widest text-xs md:text-sm uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             RAN FITNESS VIRTUAL TOUR
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+            className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-all cursor-pointer border border-white/10"
             title="Close"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Video Area: Centered, fits screen */}
-        <div 
-          className="flex-1 w-full relative overflow-hidden my-4 rounded-lg shadow-2xl" 
-          onClick={togglePlay}
-        >
-          {/* Loading Skeleton */}
-          {loadingVideo && !videoFailed && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/80 gap-3">
-              <div className="h-10 w-10 rounded-full border-2 border-yellow-400/20 border-t-yellow-400 animate-spin" />
-              <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Buffering video tour...</span>
-            </div>
-          )}
-
-          {/* Error / Failed state */}
-          {videoFailed && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 text-2xl">
-                ⚠️
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-display font-bold uppercase text-zinc-200">Video Failed to Load</h4>
-                <p className="text-zinc-500 text-xs max-w-sm">The video tour could not be loaded. Please verify connection and retry.</p>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setVideoFailed(false);
-                  setLoadingVideo(true);
-                  if (videoRef.current) {
-                    videoRef.current.load();
-                    videoRef.current.play().catch(() => {});
-                  }
-                }}
-                className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-[10px] font-mono font-bold uppercase tracking-widest transition-all"
-              >
-                Retry Loading
-              </button>
-            </div>
-          )}
-
-          {/* Blurred Background Video */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 opacity-25">
-            <video
-              src={videoUrl}
-              muted
-              loop
-              playsInline
-              className="w-full h-full object-cover blur-[80px] scale-110"
-              style={{
-                transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none'
-              }}
-              ref={(el) => {
-                if (el && !videoFailed) {
-                  if (playing) el.play().catch(() => {});
-                  else el.pause();
-                  if (Math.abs(el.currentTime - (videoRef.current?.currentTime || 0)) > 0.5) {
-                    el.currentTime = videoRef.current?.currentTime || 0;
-                  }
-                }
-              }}
-            />
-          </div>
-
-          {/* Main Video Element */}
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            muted={muted}
-            playsInline
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onLoadStart={() => { setLoadingVideo(true); setVideoFailed(false); }}
-            onCanPlay={() => setLoadingVideo(false)}
-            onWaiting={() => setLoadingVideo(true)}
-            onPlaying={() => setLoadingVideo(false)}
-            onError={() => { setVideoFailed(true); setLoadingVideo(false); }}
-            onEnded={() => setPlaying(false)}
-            style={{
-              transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
-              objectFit: isPortrait ? 'contain' : 'cover'
-            }}
-            className="absolute inset-0 w-full h-full z-10 transition-transform duration-300 rounded-lg"
-          />
-        </div>
-
         {/* Controls Bar: Bottom Left (Play/Pause, Volume, Timer), Bottom Right (Book Trial, Rotate) */}
-        <div className={`space-y-4 transition-opacity duration-300 z-20 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className={`space-y-4 pointer-events-auto transition-opacity duration-300 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 rounded-xl backdrop-blur-sm ${showControls ? 'opacity-100' : 'opacity-0'}`}>
           {/* Seek bar */}
           <div
             ref={progressRef}
@@ -279,7 +274,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
               >
                 {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
-              <span className="text-[10px] font-mono text-zinc-400">
+              <span className="text-[10px] font-mono text-zinc-300 drop-shadow">
                 {currentTime} / {duration}
               </span>
             </div>
@@ -288,7 +283,7 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
             <div className="flex items-center gap-3">
               <button
                 onClick={(e) => { e.stopPropagation(); setRotationIndex(prev => (prev + 1) % 4); }}
-                className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-yellow-400 text-[9px] font-mono font-bold uppercase tracking-wider rounded transition-all border border-zinc-700 cursor-pointer flex items-center gap-1"
+                className="px-3 py-1 bg-black/60 hover:bg-black/80 text-yellow-400 text-[9px] font-mono font-bold uppercase tracking-wider rounded transition-all border border-zinc-850 cursor-pointer flex items-center gap-1"
                 title="Rotate Video"
               >
                 🔄 Rotate {rotation !== 0 ? `(${rotation}°)` : ''}
@@ -311,7 +306,6 @@ export function VirtualTourModal({ isOpen, onClose, videoUrl, onBookTrial }: Vir
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
