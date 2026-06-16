@@ -544,7 +544,7 @@ export const EquipmentSvg: React.FC<EquipmentSvgProps> = ({ name, className = ''
           <path d="M 20 50 L 25 50 M 60 50 L 55 50 M 20 85 L 20 80 M 60 85 L 60 80" stroke={yellow} strokeWidth="2" />
           
           {/* Etched dimension tags */}
-          <text x="40" y="72" fill={white} fontSize="10" fontWeight="bold" textAnchor="middle">30"</text>
+          <text x="40" y="72" fill={white} fontSize="10" fontWeight="bold" textAnchor="middle">30&quot;</text>
         </motion.g>
       </svg>
     );

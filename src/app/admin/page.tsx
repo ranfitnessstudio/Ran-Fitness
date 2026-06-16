@@ -1311,7 +1311,7 @@ ${xmlRows}
                   </div>
                 </div>
 
-                {/* Charts Grid */
+                {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Attendance Tracking Chart */}
                   <div className="bg-white dark:bg-zinc-950 p-6 rounded-xl border border-zinc-200 dark:border-zinc-900 space-y-4">

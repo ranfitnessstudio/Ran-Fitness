@@ -1020,7 +1020,7 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                       <div className="bg-zinc-950/80 border border-zinc-900 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
                           <div>
-                            <span className="text-[8px] text-zinc-500 font-mono block uppercase font-bold">Today's Workout</span>
+                            <span className="text-[8px] text-zinc-500 font-mono block uppercase font-bold">Today&apos;s Workout</span>
                             <h4 className="text-xs font-bold text-yellow-400 font-sans uppercase">{workoutPlan.today_workout || 'No custom name'}</h4>
                           </div>
                           <div className="text-right">

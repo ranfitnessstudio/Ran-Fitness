@@ -834,6 +834,7 @@ async function ensureDbInitialized() {
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS meal_schedule TEXT`;
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS compliance_pct INT DEFAULT 100`;
 
+    await sql`
       CREATE TABLE IF NOT EXISTS virtual_tour (
         id INT PRIMARY KEY DEFAULT 1,
         video_url TEXT NOT NULL DEFAULT '',
