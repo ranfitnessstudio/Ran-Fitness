@@ -8,8 +8,7 @@ export async function middleware(request: NextRequest) {
   // Protect Admin CMS and sensitive API routes
   if (
     pathname.startsWith('/admin') || 
-    pathname.startsWith('/api/db') || 
-    pathname.startsWith('/api/analytics') || 
+    (pathname.startsWith('/api/analytics') && request.method === 'GET') || 
     pathname.startsWith('/api/ai-status')
   ) {
     const adminSession = request.cookies.get('ran_admin_session');

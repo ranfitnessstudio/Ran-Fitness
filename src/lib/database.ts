@@ -858,12 +858,10 @@ async function ensureDbInitialized() {
       )
     `;
 
-    await sql`
-      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS book_trial_clicks INT DEFAULT 0;
-      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS virtual_tour_opens INT DEFAULT 0;
-      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS trainer_card_clicks INT DEFAULT 0;
-      ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS equipment_views INT DEFAULT 0;
-    `;
+    await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS book_trial_clicks INT DEFAULT 0`;
+    await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS virtual_tour_opens INT DEFAULT 0`;
+    await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS trainer_card_clicks INT DEFAULT 0`;
+    await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS equipment_views INT DEFAULT 0`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS admin_credentials (

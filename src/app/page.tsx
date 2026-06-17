@@ -210,6 +210,14 @@ export default function Home() {
         db.logVisit()
       ]);
       setSettings(s);
+      if (s) {
+        console.log("[NOTICE SETTINGS LOADED]", s.announcement_active);
+        if (s.announcement_active) {
+          console.log("[NOTICE ENABLED]");
+        } else {
+          console.log("[NOTICE DISABLED]");
+        }
+      }
       setSocials(soc);
       setTrainers(t);
       setEquipment(e);
@@ -416,17 +424,17 @@ export default function Home() {
               {/* RIGHT: Actions / Theme Toggle */}
               <div className="flex items-center justify-end lg:flex-1 gap-3 xl:gap-4 shrink-0 min-w-max">
                 {/* Desktop Actions */}
-                <div className="hidden lg:flex items-center gap-3 xl:gap-4">
+                <div className="hidden lg:flex items-center gap-2 xl:gap-3 2xl:gap-4">
                   <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
                   <button
                     onClick={() => setMemberLoginOpen(true)}
-                    className="rounded-full border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 dark:hover:border-yellow-400 px-4 xl:px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider text-zinc-650 dark:text-zinc-300 hover:text-yellow-500 dark:hover:text-yellow-400 transition-all bg-transparent cursor-pointer whitespace-nowrap"
+                    className="rounded-full border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 dark:hover:border-yellow-400 px-3 xl:px-4 2xl:px-5 py-2 text-[10px] xl:text-xs font-mono font-bold uppercase tracking-wider text-zinc-650 dark:text-zinc-300 hover:text-yellow-500 dark:hover:text-yellow-400 transition-all bg-transparent cursor-pointer whitespace-nowrap"
                   >
                     Member Portal
                   </button>
                   <button
                     onClick={() => openBooking('General Trial')}
-                    className="rounded-full bg-yellow-400 text-black px-4 xl:px-5 py-2 text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 hover:scale-105 active:scale-95 transition-all animate-heartpulse cursor-pointer whitespace-nowrap"
+                    className="rounded-full bg-yellow-400 text-black px-3 xl:px-4 2xl:px-5 py-2 text-[10px] xl:text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 hover:scale-105 active:scale-95 transition-all animate-heartpulse cursor-pointer whitespace-nowrap"
                   >
                     Book Free Trial
                   </button>
