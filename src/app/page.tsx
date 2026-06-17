@@ -422,7 +422,7 @@ export default function Home() {
               </nav>
 
               {/* RIGHT: Actions / Theme Toggle */}
-              <div className="flex items-center justify-end lg:flex-1 gap-3 xl:gap-4 shrink-0 min-w-max">
+              <div className="flex items-center justify-end lg:flex-1 gap-3 xl:gap-4 shrink-0 min-w-max mr-4 xl:mr-6">
                 {/* Desktop Actions */}
                 <div className="hidden lg:flex items-center gap-2 xl:gap-3 2xl:gap-4">
                   <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
@@ -434,7 +434,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => openBooking('General Trial')}
-                    className="rounded-full bg-yellow-400 text-black px-3 xl:px-4 2xl:px-5 py-2 text-[10px] xl:text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 hover:scale-105 active:scale-95 transition-all animate-heartpulse cursor-pointer whitespace-nowrap"
+                    className="rounded-full bg-yellow-400 text-black px-2.5 xl:px-3 2xl:px-4 py-2 text-[9.5px] xl:text-[11px] 2xl:text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 hover:scale-105 active:scale-95 transition-all animate-heartpulse cursor-pointer whitespace-nowrap"
                   >
                     Book Free Trial
                   </button>
