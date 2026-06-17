@@ -152,10 +152,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                 {isSubmitting ? 'Verifying Credentials...' : 'Access Dashboard'}
               </button>
             </form>
-
-            <div className="mt-6 text-center text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
-              Authorized Personnel Only
-            </div>
           </motion.div>
         </div>
       )}
