@@ -112,7 +112,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="text"
                   required
-                  placeholder="admin"
+                  placeholder="Enter username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-400 dark:placeholder-zinc-650"
@@ -153,8 +153,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
               </button>
             </form>
 
-            <div className="mt-6 text-center text-[10px] text-zinc-500 font-mono">
-              Demo access: <strong className="text-zinc-600 dark:text-zinc-500">admin / RanFitness2026!</strong> (Changeable via Security Panel)
+            <div className="mt-6 text-center text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
+              Authorized Personnel Only
             </div>
           </motion.div>
         </div>

@@ -616,7 +616,7 @@ export default function AdminDashboard() {
   };
 
   const handleResetAdminCredentials = async () => {
-    if (!confirm('Are you sure you want to reset admin credentials to default (admin / RanFitness2026!)?')) {
+    if (!confirm('Are you sure you want to reset admin credentials to system defaults?')) {
       return;
     }
     try {
