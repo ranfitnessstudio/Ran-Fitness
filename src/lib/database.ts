@@ -130,6 +130,7 @@ export interface Member {
   email: string;
   password_hash?: string;
   membership_type: 'Monthly' | 'Quarterly' | 'Half-Yearly' | 'Yearly';
+  plan_id?: string;
   start_date: string;
   end_date: string;
   status: 'Active' | 'Expiring Soon' | 'Expired' | 'Suspended';
@@ -359,8 +360,8 @@ const SEED_EQUIPMENT: Equipment[] = [
 const SEED_PLANS: MembershipPlan[] = [
   {
     id: "p1",
-    name: "Basic Strength & Cardio",
-    price: 1500,
+    name: "Monthly Plan",
+    price: 3000,
     duration: "Monthly",
     benefits: [
       "Access to Strength Training floor",
@@ -373,9 +374,9 @@ const SEED_PLANS: MembershipPlan[] = [
   },
   {
     id: "p2",
-    name: "CrossFit Elite Program",
-    price: 2500,
-    duration: "Monthly",
+    name: "Quarterly Plan",
+    price: 5000,
+    duration: "Quarterly",
     benefits: [
       "All Cardio & Strength benefits",
       "Dedicated CrossFit Training Zone",
@@ -383,20 +384,31 @@ const SEED_PLANS: MembershipPlan[] = [
       "Weekly trainer assessment checklist",
       "1 Custom Workout template/mo"
     ],
-    popular_badge: true
+    popular_badge: false
   },
   {
     id: "p3",
-    name: "VIP Personalized Guidance",
-    price: 5000,
-    duration: "Monthly",
+    name: "Half-Yearly Plan",
+    price: 8000,
+    duration: "Half-Yearly",
     benefits: [
       "All CrossFit Elite benefits",
       "1-on-1 Personal Trainer sessions (3x/week)",
       "Fully customized Diet & Nutrition guide",
-      "Priority equipment booking access",
-      "Monthly health metrics evaluation",
-      "Direct WhatsApp access to Head Coach"
+      "Priority equipment booking access"
+    ],
+    popular_badge: true
+  },
+  {
+    id: "p4",
+    name: "Annual Plan",
+    price: 12000,
+    duration: "Annual",
+    benefits: [
+      "All Half-Yearly Pro benefits",
+      "Daily personal trainer guidance",
+      "Direct VIP WhatsApp access to Vikram Ran",
+      "Free entry to all special gym events"
     ],
     popular_badge: false
   }
@@ -829,6 +841,11 @@ async function ensureDbInitialized() {
     `;
 
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS plan_id TEXT`;
+    await sql`UPDATE members SET plan_id = 'p1' WHERE plan_id IS NULL AND (membership_type = 'Monthly' OR membership_type = 'Basic Strength & Cardio')`;
+    await sql`UPDATE members SET plan_id = 'p2' WHERE plan_id IS NULL AND (membership_type = 'Quarterly' OR membership_type = 'CrossFit Elite Program')`;
+    await sql`UPDATE members SET plan_id = 'p3' WHERE plan_id IS NULL AND (membership_type = 'Half-Yearly' OR membership_type = 'Half-Yearly Plan')`;
+    await sql`UPDATE members SET plan_id = 'p4' WHERE plan_id IS NULL AND (membership_type = 'Yearly' OR membership_type = 'Annual' OR membership_type = 'VIP Personalized Guidance')`;
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS calories_target INT DEFAULT 2000`;
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS protein_target INT DEFAULT 150`;
     await sql`ALTER TABLE diet_plans ADD COLUMN IF NOT EXISTS meal_schedule TEXT`;
@@ -960,14 +977,18 @@ async function ensureDbInitialized() {
       }
     }
 
-    const plansCount = await sql`SELECT COUNT(*)::int as count FROM plans`;
-    if (plansCount[0].count === 0) {
-      for (const p of SEED_PLANS) {
-        await sql`
-          INSERT INTO plans (id, name, price, duration, benefits, popular_badge)
-          VALUES (${p.id}, ${p.name}, ${p.price}, ${p.duration}, ${p.benefits}, ${p.popular_badge})
-        `;
-      }
+    // Upsert plans to ensure new prices and plans (Half-Yearly) are loaded
+    for (const p of SEED_PLANS) {
+      await sql`
+        INSERT INTO plans (id, name, price, duration, benefits, popular_badge)
+        VALUES (${p.id}, ${p.name}, ${p.price}, ${p.duration}, ${p.benefits}, ${p.popular_badge})
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          price = EXCLUDED.price,
+          duration = EXCLUDED.duration,
+          benefits = EXCLUDED.benefits,
+          popular_badge = EXCLUDED.popular_badge
+      `;
     }
 
     const transCount = await sql`SELECT COUNT(*)::int as count FROM transformations`;
@@ -2161,6 +2182,22 @@ async saveMember(member: Partial<Member>): Promise<Member> {
     }
   }
 
+  let planId = member.plan_id;
+  let membershipType = member.membership_type;
+
+  if (planId) {
+    if (planId === 'p1') membershipType = 'Monthly';
+    else if (planId === 'p2') membershipType = 'Quarterly';
+    else if (planId === 'p3') membershipType = 'Half-Yearly';
+    else if (planId === 'p4') membershipType = 'Yearly';
+  } else if (membershipType) {
+    const typeStr = String(membershipType);
+    if (typeStr === 'Monthly' || typeStr === 'Basic Strength & Cardio') planId = 'p1';
+    else if (typeStr === 'Quarterly' || typeStr === 'CrossFit Elite Program') planId = 'p2';
+    else if (typeStr === 'Half-Yearly') planId = 'p3';
+    else if (typeStr === 'Yearly' || typeStr === 'Annual' || typeStr === 'VIP Personalized Guidance') planId = 'p4';
+  }
+
   const newMember: Member = {
     id: member.id,
     member_id: member_id!,
@@ -2168,7 +2205,8 @@ async saveMember(member: Partial<Member>): Promise<Member> {
     phone: member.phone!,
     email: member.email || '',
     password_hash: member.password_hash || '',
-    membership_type: member.membership_type!,
+    membership_type: membershipType!,
+    plan_id: planId || 'p1',
     start_date,
     end_date: member.end_date!,
     status,
@@ -2210,6 +2248,7 @@ async saveMember(member: Partial<Member>): Promise<Member> {
           phone = ${newMember.phone},
           email = ${newMember.email},
           membership_type = ${newMember.membership_type},
+          plan_id = ${newMember.plan_id},
           start_date = ${newMember.start_date},
           end_date = ${newMember.end_date},
           status = ${newMember.status},
@@ -2222,8 +2261,8 @@ async saveMember(member: Partial<Member>): Promise<Member> {
       notifyTelegramMemberUpdate(newMember.name, newMember.membership_type, label, newMember.end_date);
     } else {
       const rows = await sql`
-        INSERT INTO members (member_id, name, phone, email, password_hash, membership_type, start_date, end_date, status, notes, created_at)
-        VALUES (${newMember.member_id}, ${newMember.name}, ${newMember.phone}, ${newMember.email}, ${newMember.password_hash}, ${newMember.membership_type}, ${newMember.start_date}, ${newMember.end_date}, ${newMember.status}, ${newMember.notes}, ${newMember.created_at})
+        INSERT INTO members (member_id, name, phone, email, password_hash, membership_type, plan_id, start_date, end_date, status, notes, created_at)
+        VALUES (${newMember.member_id}, ${newMember.name}, ${newMember.phone}, ${newMember.email}, ${newMember.password_hash}, ${newMember.membership_type}, ${newMember.plan_id}, ${newMember.start_date}, ${newMember.end_date}, ${newMember.status}, ${newMember.notes}, ${newMember.created_at})
         RETURNING *
       `;
       savedRow = rows[0] as unknown as Member;

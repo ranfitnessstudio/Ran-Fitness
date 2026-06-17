@@ -407,7 +407,7 @@ export default function Home() {
               </div>
 
               {/* CENTER: Navigation Links */}
-              <nav className="hidden lg:flex items-center gap-4 xl:gap-6 2xl:gap-8 font-mono text-xs uppercase tracking-widest lg:mx-20 xl:mx-28 2xl:mx-32 shrink-0">
+              <nav className="hidden lg:flex items-center gap-3 xl:gap-5 2xl:gap-8 font-mono text-[10.5px] xl:text-xs uppercase tracking-widest lg:mx-6 xl:mx-12 2xl:mx-16 shrink-0">
                 {['about', 'equipment', 'trainers', 'plans', 'transformations', 'contact'].map((item) => (
                   <button
                     key={item}

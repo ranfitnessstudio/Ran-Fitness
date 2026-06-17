@@ -36,6 +36,37 @@ export default function AdminDashboard() {
   const [authorized, setAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState<'leads' | 'careers' | 'events' | 'trainers' | 'equipment' | 'plans' | 'transformations' | 'settings' | 'ai' | 'members' | 'dashboard' | 'analytics' | 'virtualtour'>('dashboard');
 
+  // Helper functions for membership plan calculation
+  const getPlanPrice = (planId: string | undefined, type: string, plansList: MembershipPlan[]): number => {
+    const plan = plansList.find(p => p.id === planId || p.duration === type || p.name === type);
+    if (plan) return Number(plan.price);
+    
+    // Hardcoded defaults fallback
+    const t = type.toLowerCase();
+    if (t.includes('monthly') || planId === 'p1') return 3000;
+    if (t.includes('quarterly') || planId === 'p2') return 5000;
+    if (t.includes('half-yearly') || planId === 'p3') return 8000;
+    if (t.includes('yearly') || t.includes('annual') || planId === 'p4') return 12000;
+    return 3000;
+  };
+
+  const getPlanDuration = (planId: string | undefined, type: string, plansList: MembershipPlan[]): number => {
+    const plan = plansList.find(p => p.id === planId || p.duration === type || p.name === type);
+    if (plan) {
+      const dur = plan.duration.toLowerCase();
+      if (dur.includes('monthly')) return 1;
+      if (dur.includes('quarterly')) return 3;
+      if (dur.includes('half-yearly')) return 6;
+      if (dur.includes('yearly') || dur.includes('annual')) return 12;
+    }
+    const t = type.toLowerCase();
+    if (t.includes('monthly') || planId === 'p1') return 1;
+    if (t.includes('quarterly') || planId === 'p2') return 3;
+    if (t.includes('half-yearly') || planId === 'p3') return 6;
+    if (t.includes('yearly') || t.includes('annual') || planId === 'p4') return 12;
+    return 1;
+  };
+
   // Global theme state for CMS
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
@@ -1136,14 +1167,24 @@ ${xmlRows}
                 
                 const monthlyRevenue = members.reduce((sum, m) => {
                   if (m.status === 'Expired' || m.status === 'Suspended') return sum;
-                  if (m.membership_type === 'Monthly') return sum + 2000;
-                  if (m.membership_type === 'Quarterly') return sum + 5500 / 3;
-                  if (m.membership_type === 'Half-Yearly') return sum + 10000 / 6;
-                  if (m.membership_type === 'Yearly') return sum + 18000 / 12;
-                  return sum;
+                  const price = getPlanPrice(m.plan_id, m.membership_type, plans);
+                  const duration = getPlanDuration(m.plan_id, m.membership_type, plans);
+                  return sum + (price / duration);
                 }, 0);
                 
                 const yearlyRevenue = monthlyRevenue * 12;
+
+                const expectedRenewals = members.filter(m => {
+                  if (m.status === 'Suspended' || m.status === 'Expired') return false;
+                  const diff = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return diff >= 0 && diff <= 30;
+                }).reduce((sum, m) => {
+                  return sum + getPlanPrice(m.plan_id, m.membership_type, plans);
+                }, 0);
+
+                const expiredRevenue = members.filter(m => m.status === 'Expired').reduce((sum, m) => {
+                  return sum + getPlanPrice(m.plan_id, m.membership_type, plans);
+                }, 0);
 
                 const expiringSoonList = members.filter(m => {
                   if (m.status === 'Suspended' || m.status === 'Expired') return false;
@@ -1216,14 +1257,29 @@ ${xmlRows}
                         
                         <div className="w-full h-60 flex items-center justify-center">
                           {(() => {
-                            const chartPoints = [
-                              { month: 'Jan', value: 24000 },
-                              { month: 'Feb', value: 32500 },
-                              { month: 'Mar', value: 45000 },
-                              { month: 'Apr', value: 68000 },
-                              { month: 'May', value: 89500 },
-                              { month: 'Jun', value: Math.round(monthlyRevenue) || 95000 }
-                            ];
+                            const chartPoints = Array.from({ length: 6 }, (_, i) => {
+                              const d = new Date();
+                              d.setMonth(d.getMonth() - (5 - i));
+                              const monthNum = d.getMonth();
+                              const year = d.getFullYear();
+                              const label = d.toLocaleDateString('en-US', { month: 'short' });
+                              
+                              const activeMembersInMonth = members.filter(mem => {
+                                const start = new Date(mem.start_date);
+                                const end = new Date(mem.end_date);
+                                const monthStart = new Date(year, monthNum, 1);
+                                const monthEnd = new Date(year, monthNum + 1, 0);
+                                return start <= monthEnd && end >= monthStart && mem.status !== 'Suspended';
+                              });
+                              
+                              const val = activeMembersInMonth.reduce((sum, mem) => {
+                                const price = getPlanPrice(mem.plan_id, mem.membership_type, plans);
+                                const dur = getPlanDuration(mem.plan_id, mem.membership_type, plans);
+                                return sum + (price / dur);
+                              }, 0);
+                              
+                              return { month: label, value: Math.round(val) || 3000 };
+                            });
                             const maxRevVal = Math.max(...chartPoints.map(p => p.value), 40000);
                             const points = chartPoints.map((p, index) => {
                               const x = 50 + index * 70;
@@ -1323,13 +1379,23 @@ ${xmlRows}
             const expiredMembersCount = members.filter(m => m.status === 'Expired').length;
             const monthlyRevenue = members.reduce((sum, m) => {
               if (m.status === 'Expired' || m.status === 'Suspended') return sum;
-              if (m.membership_type === 'Monthly') return sum + 2000;
-              if (m.membership_type === 'Quarterly') return sum + 5500 / 3;
-              if (m.membership_type === 'Half-Yearly') return sum + 10000 / 6;
-              if (m.membership_type === 'Yearly') return sum + 18000 / 12;
-              return sum;
+              const price = getPlanPrice(m.plan_id, m.membership_type, plans);
+              const duration = getPlanDuration(m.plan_id, m.membership_type, plans);
+              return sum + (price / duration);
             }, 0);
             const yearlyRevenue = monthlyRevenue * 12;
+
+            const expectedRenewals = members.filter(m => {
+              if (m.status === 'Suspended' || m.status === 'Expired') return false;
+              const diff = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              return diff >= 0 && diff <= 30;
+            }).reduce((sum, m) => {
+              return sum + getPlanPrice(m.plan_id, m.membership_type, plans);
+            }, 0);
+
+            const expiredRevenue = members.filter(m => m.status === 'Expired').reduce((sum, m) => {
+              return sum + getPlanPrice(m.plan_id, m.membership_type, plans);
+            }, 0);
 
             // Daily attendance chart data
             const dailyAttendanceData = Array.from({ length: 7 }, (_, i) => {
@@ -1397,18 +1463,22 @@ ${xmlRows}
               const monthNum = d.getMonth();
               const year = d.getFullYear();
               const label = d.toLocaleDateString('en-US', { month: 'short' });
-              const sum = members.filter(mem => {
-                const checkD = new Date(mem.created_at || mem.start_date);
-                return checkD.getMonth() === monthNum && checkD.getFullYear() === year;
-              }).reduce((total, mem) => {
-                let price = 0;
-                if (mem.membership_type === 'Monthly') price = 2000;
-                else if (mem.membership_type === 'Quarterly') price = 5500;
-                else if (mem.membership_type === 'Half-Yearly') price = 10000;
-                else if (mem.membership_type === 'Yearly') price = 18000;
-                return total + price;
+              
+              const activeMembersInMonth = members.filter(mem => {
+                const start = new Date(mem.start_date);
+                const end = new Date(mem.end_date);
+                const monthStart = new Date(year, monthNum, 1);
+                const monthEnd = new Date(year, monthNum + 1, 0);
+                return start <= monthEnd && end >= monthStart && mem.status !== 'Suspended';
+              });
+              
+              const sum = activeMembersInMonth.reduce((total, mem) => {
+                const price = getPlanPrice(mem.plan_id, mem.membership_type, plans);
+                const dur = getPlanDuration(mem.plan_id, mem.membership_type, plans);
+                return total + (price / dur);
               }, 0);
-              return { label, value: sum };
+              
+              return { label, value: Math.round(sum) };
             });
 
             // AI Diagnostics Stats
@@ -1439,26 +1509,30 @@ ${xmlRows}
             return (
               <div className="space-y-6">
                 {/* Member Analytics Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                   <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono block">Total Members</span>
-                    <div className="text-2xl font-black italic text-yellow-500 dark:text-yellow-400 font-display">{totalMembersCount} Members</div>
+                    <div className="text-xl font-black italic text-yellow-500 dark:text-yellow-400 font-display">{totalMembersCount} Members</div>
                   </div>
                   <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono block">Active Members</span>
-                    <div className="text-2xl font-black italic text-green-500 font-display">{activeMembersCount} Active</div>
+                    <div className="text-xl font-black italic text-green-500 font-display">{activeMembersCount} Active</div>
                   </div>
                   <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono block">Expired Members</span>
-                    <div className="text-2xl font-black italic text-red-500 font-display">{expiredMembersCount} Expired</div>
+                    <div className="text-xl font-black italic text-red-500 font-display">{expiredMembersCount} Expired</div>
                   </div>
                   <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono block">Monthly Revenue</span>
-                    <div className="text-2xl font-black italic text-yellow-400 font-display">₹{Math.round(monthlyRevenue).toLocaleString('en-IN')}</div>
+                    <div className="text-xl font-black italic text-yellow-400 font-display">₹{Math.round(monthlyRevenue).toLocaleString('en-IN')}</div>
                   </div>
-                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
-                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Yearly Revenue</span>
-                    <div className="text-2xl font-black italic text-white font-display">₹{Math.round(yearlyRevenue).toLocaleString('en-IN')}</div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all" title="Expected renewals from active plans expiring within 30 days">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Expected Renewals</span>
+                    <div className="text-xl font-black italic text-purple-450 dark:text-purple-400 font-display">₹{Math.round(expectedRenewals).toLocaleString('en-IN')}</div>
+                  </div>
+                  <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all" title="Loss of revenue from expired memberships">
+                    <span className="text-[10px] text-zinc-500 uppercase font-mono block">Expired Revenue</span>
+                    <div className="text-xl font-black italic text-red-400 font-display">₹{Math.round(expiredRevenue).toLocaleString('en-IN')}</div>
                   </div>
                 </div>
 
@@ -1852,12 +1926,17 @@ ${xmlRows}
                                 onClick={() => {
                                   const confirmRenew = confirm(`Renew ${m.name}'s membership plan?`);
                                   if (confirmRenew) {
-                                    // Auto sets start as today, end + 30 days
                                     const today = new Date().toISOString().split('T')[0];
+                                    const pId = m.plan_id || plans.find(p => p.name === m.membership_type || p.duration === m.membership_type)?.id || 'p1';
+                                    const selectedPlan = plans.find(p => p.id === pId);
                                     let days = 30;
-                                    if (m.membership_type === 'Quarterly') days = 90;
-                                    else if (m.membership_type === 'Half-Yearly') days = 180;
-                                    else if (m.membership_type === 'Yearly') days = 365;
+                                    if (selectedPlan) {
+                                      const dur = selectedPlan.duration.toLowerCase();
+                                      if (dur.includes('monthly')) days = 30;
+                                      else if (dur.includes('quarterly')) days = 90;
+                                      else if (dur.includes('half-yearly')) days = 180;
+                                      else if (dur.includes('yearly') || dur.includes('annual')) days = 365;
+                                    }
                                     
                                     const end = new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
                                     db.saveMember({
@@ -3820,24 +3899,32 @@ ${xmlRows}
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Membership Tier</label>
                   <select
-                    value={editingMember.membership_type || 'Monthly'}
+                    value={editingMember.plan_id || plans.find(p => p.name === editingMember.membership_type || p.duration === editingMember.membership_type)?.id || 'p1'}
                     onChange={(e) => {
-                      const mType = e.target.value as any;
-                      // Auto adjust end date based on selection
-                      const start = editingMember.start_date || new Date().toISOString().split('T')[0];
-                      let days = 30;
-                      if (mType === 'Quarterly') days = 90;
-                      else if (mType === 'Half-Yearly') days = 180;
-                      else if (mType === 'Yearly') days = 365;
-                      const end = new Date(new Date(start).getTime() + days * 86400000).toISOString().split('T')[0];
-                      setEditingMember({ ...editingMember, membership_type: mType, end_date: end });
+                      const pId = e.target.value;
+                      const selectedPlan = plans.find(p => p.id === pId);
+                      if (selectedPlan) {
+                        const start = editingMember.start_date || new Date().toISOString().split('T')[0];
+                        let days = 30;
+                        const dur = selectedPlan.duration.toLowerCase();
+                        if (dur.includes('monthly')) days = 30;
+                        else if (dur.includes('quarterly')) days = 90;
+                        else if (dur.includes('half-yearly')) days = 180;
+                        else if (dur.includes('yearly') || dur.includes('annual')) days = 365;
+                        const end = new Date(new Date(start).getTime() + days * 86400000).toISOString().split('T')[0];
+                        setEditingMember({
+                          ...editingMember,
+                          plan_id: pId,
+                          membership_type: selectedPlan.duration as any,
+                          end_date: end
+                        });
+                      }
                     }}
-                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                    className="w-full rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none font-mono uppercase"
                   >
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Half-Yearly">Half-Yearly</option>
-                    <option value="Yearly">Yearly</option>
+                    {plans.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} (₹{p.price})</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -3864,11 +3951,16 @@ ${xmlRows}
                     value={editingMember.start_date || ''}
                     onChange={(e) => {
                       const start = e.target.value;
-                      const mType = editingMember.membership_type || 'Monthly';
+                      const pId = editingMember.plan_id || plans.find(p => p.name === editingMember.membership_type || p.duration === editingMember.membership_type)?.id || 'p1';
+                      const selectedPlan = plans.find(p => p.id === pId);
                       let days = 30;
-                      if (mType === 'Quarterly') days = 90;
-                      else if (mType === 'Half-Yearly') days = 180;
-                      else if (mType === 'Yearly') days = 365;
+                      if (selectedPlan) {
+                        const dur = selectedPlan.duration.toLowerCase();
+                        if (dur.includes('monthly')) days = 30;
+                        else if (dur.includes('quarterly')) days = 90;
+                        else if (dur.includes('half-yearly')) days = 180;
+                        else if (dur.includes('yearly') || dur.includes('annual')) days = 365;
+                      }
                       const end = new Date(new Date(start).getTime() + days * 86400000).toISOString().split('T')[0];
                       setEditingMember({ ...editingMember, start_date: start, end_date: end });
                     }}
