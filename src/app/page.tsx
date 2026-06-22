@@ -107,9 +107,318 @@ const StatCounter: React.FC<{ value: string; label: string; suffix?: string }> =
   );
 };
 
+const homepageCategories = [
+  { id: "Strength Training", label: "🏋️ Strength Training" },
+  { id: "HIIT & Cardio", label: "🏃 HIIT & Cardio" },
+  { id: "Functional Fitness", label: "🤸 Functional Fitness" },
+  { id: "Fat Loss Special", label: "🔥 Fat Loss Special" },
+  { id: "Muscle Gain", label: "💪 Muscle Gain" },
+  { id: "Mobility & Flex", label: "🧘 Mobility & Flex" },
+  { id: "Recovery & Yoga", label: "🌱 Recovery & Yoga" }
+];
+
+const homepageWorkouts = [
+  // Strength Training
+  {
+    id: "str_1",
+    name: "Full Body Power Hypertrophy",
+    category: "Strength Training",
+    duration: "45 mins",
+    difficulty: "Advanced",
+    calories: "450 kcal",
+    description: "High load compound movements targeting major muscle groups for maximum hypertrophic response.",
+    image: "/images/back_muscle_traps.png"
+  },
+  {
+    id: "str_2",
+    name: "Push Day Strength Focus",
+    category: "Strength Training",
+    duration: "50 mins",
+    difficulty: "Intermediate",
+    calories: "400 kcal",
+    description: "Heavy bench press, overhead press, and tricep extensions.",
+    image: "/images/male_athlete.png"
+  },
+  {
+    id: "str_3",
+    name: "Pull Day Back Builder",
+    category: "Strength Training",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "380 kcal",
+    description: "Focusing on rows, pull-ups, and deadlifts for a strong back.",
+    image: "/images/back_muscle_traps.png"
+  },
+  {
+    id: "str_4",
+    name: "Lower Body Compound Builder",
+    category: "Strength Training",
+    duration: "60 mins",
+    difficulty: "Advanced",
+    calories: "550 kcal",
+    description: "Squats, lunges, and leg presses for lower body foundation.",
+    image: "/images/male_athlete.png"
+  },
+
+  // HIIT & Cardio
+  {
+    id: "cardio_1",
+    name: "Metabolic Conditioning (MetCon)",
+    category: "HIIT & Cardio",
+    duration: "30 mins",
+    difficulty: "Intermediate",
+    calories: "500 kcal",
+    description: "Short high-intensity intervals followed by active rest periods.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "cardio_2",
+    name: "Zumba Dance Cardio",
+    category: "HIIT & Cardio",
+    duration: "45 mins",
+    difficulty: "Beginner",
+    calories: "350 kcal",
+    description: "High-tempo rhythmic dance workout led by our top dance coaches.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "cardio_3",
+    name: "Tabata Shred Protocol",
+    category: "HIIT & Cardio",
+    duration: "20 mins",
+    difficulty: "Advanced",
+    calories: "300 kcal",
+    description: "20s on, 10s off classic Tabata format to push anaerobic capacity.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "cardio_4",
+    name: "Stair Climber Interval Burn",
+    category: "HIIT & Cardio",
+    duration: "25 mins",
+    difficulty: "Intermediate",
+    calories: "380 kcal",
+    description: "Intense lower body cardiovascular engine builder using high speed stairs.",
+    image: "/images/male_athlete.png"
+  },
+
+  // Functional Fitness
+  {
+    id: "func_1",
+    name: "CrossFit Hybrid Circuit",
+    category: "Functional Fitness",
+    duration: "45 mins",
+    difficulty: "Advanced",
+    calories: "480 kcal",
+    description: "Olympic lifts, box jumps, and kettlebell swings combined.",
+    image: "/images/male_athlete.png"
+  },
+  {
+    id: "func_2",
+    name: "Core & Stability Flow",
+    category: "Functional Fitness",
+    duration: "30 mins",
+    difficulty: "Beginner",
+    calories: "220 kcal",
+    description: "Focusing on deep core activation, balance, and single-leg stability.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "func_3",
+    name: "Kettlebell Power Flow",
+    category: "Functional Fitness",
+    duration: "35 mins",
+    difficulty: "Intermediate",
+    calories: "340 kcal",
+    description: "Full body ballistic movements with kettlebells for endurance.",
+    image: "/images/male_athlete.png"
+  },
+  {
+    id: "func_4",
+    name: "Sled Pushes & Battle Ropes",
+    category: "Functional Fitness",
+    duration: "30 mins",
+    difficulty: "Advanced",
+    calories: "420 kcal",
+    description: "High power, low impact functional strength conditioning circuit.",
+    image: "/images/back_muscle_traps.png"
+  },
+
+  // Fat Loss Special
+  {
+    id: "fat_1",
+    name: "LISS Fat Burning Cardio",
+    category: "Fat Loss Special",
+    duration: "50 mins",
+    difficulty: "Beginner",
+    calories: "380 kcal",
+    description: "Low-intensity steady state exercise optimized for fat oxidation.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "fat_2",
+    name: "High-Intensity Fat Shred",
+    category: "Fat Loss Special",
+    duration: "35 mins",
+    difficulty: "Advanced",
+    calories: "460 kcal",
+    description: "Full body plyometrics and metabolic acceleration circuit.",
+    image: "/images/male_athlete.png"
+  },
+  {
+    id: "fat_3",
+    name: "Abs & Cardio Burner",
+    category: "Fat Loss Special",
+    duration: "30 mins",
+    difficulty: "Intermediate",
+    calories: "280 kcal",
+    description: "Core-focused circuits interleaved with dynamic cardio blasts.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "fat_4",
+    name: "Rowing Machine Fat Burn",
+    category: "Fat Loss Special",
+    duration: "40 mins",
+    difficulty: "Intermediate",
+    calories: "450 kcal",
+    description: "Low impact, high calorie expenditure rowing program.",
+    image: "/images/male_athlete.png"
+  },
+
+  // Muscle Gain
+  {
+    id: "gain_1",
+    name: "Arms & Shoulder Pump",
+    category: "Muscle Gain",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "320 kcal",
+    description: "High volume isolation curls, extensions, and lateral raises.",
+    image: "/images/male_athlete.png"
+  },
+  {
+    id: "gain_2",
+    name: "Chest & Back Super-sets",
+    category: "Muscle Gain",
+    duration: "50 mins",
+    difficulty: "Advanced",
+    calories: "420 kcal",
+    description: "Agonist-antagonist super-sets for maximum blood flow and pump.",
+    image: "/images/back_muscle_traps.png"
+  },
+  {
+    id: "gain_3",
+    name: "Leg Hypertrophy Focus",
+    category: "Muscle Gain",
+    duration: "55 mins",
+    difficulty: "Intermediate",
+    calories: "480 kcal",
+    description: "Targeting quads and hamstrings with controlled isolation lifts.",
+    image: "/images/male_athlete.png"
+  },
+  {
+    id: "gain_4",
+    name: "Shoulder Hypertrophy",
+    category: "Muscle Gain",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "310 kcal",
+    description: "High-volume shoulder capping routine to create the perfect V-taper.",
+    image: "/images/male_athlete.png"
+  },
+
+  // Mobility & Flex
+  {
+    id: "mob_1",
+    name: "Hips & Hamstring Release",
+    category: "Mobility & Flex",
+    duration: "25 mins",
+    difficulty: "Beginner",
+    calories: "120 kcal",
+    description: "Gentle mobility exercises to release tight hip flexors and lower back.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "mob_2",
+    name: "Thoracic Spine Mobility",
+    category: "Mobility & Flex",
+    duration: "20 mins",
+    difficulty: "Beginner",
+    calories: "90 kcal",
+    description: "Focus on upper back rotation, chest opening, and posture correction.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "mob_3",
+    name: "Full Body Mobility Flow",
+    category: "Mobility & Flex",
+    duration: "30 mins",
+    difficulty: "Intermediate",
+    calories: "150 kcal",
+    description: "Dynamic stretching routine to improve joint range of motion.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "mob_4",
+    name: "Shoulder Health Protocol",
+    category: "Mobility & Flex",
+    duration: "15 mins",
+    difficulty: "Beginner",
+    calories: "80 kcal",
+    description: "Rotator cuff strengthening and overhead mobility drill.",
+    image: "/images/female_athlete.png"
+  },
+
+  // Recovery & Yoga
+  {
+    id: "rec_1",
+    name: "Decompression & Stretch",
+    category: "Recovery & Yoga",
+    duration: "30 mins",
+    difficulty: "Beginner",
+    calories: "100 kcal",
+    description: "Post-workout recovery routine for optimal muscle recovery.",
+    image: "/images/back_muscle_traps.png"
+  },
+  {
+    id: "rec_2",
+    name: "Vinyasa Flow Yoga",
+    category: "Recovery & Yoga",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "180 kcal",
+    description: "Mindful breathing and active yoga poses for mind-body balance.",
+    image: "/images/female_athlete.png"
+  },
+  {
+    id: "rec_3",
+    name: "Deep Relaxation & Yin",
+    category: "Recovery & Yoga",
+    duration: "40 mins",
+    difficulty: "Beginner",
+    calories: "80 kcal",
+    description: "Long-held passive poses to stretch deep connective tissues.",
+    image: "/images/back_muscle_traps.png"
+  },
+  {
+    id: "rec_4",
+    name: "Active Foam Rolling Flow",
+    category: "Recovery & Yoga",
+    duration: "20 mins",
+    difficulty: "Beginner",
+    calories: "90 kcal",
+    description: "Self-myofascial release flow targeting tight muscles and knots.",
+    image: "/images/male_athlete.png"
+  }
+];
+
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<WebsiteSettings | null>(null);
+  const [isIdleLoaded, setIsIdleLoaded] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("Strength Training");
+  const [activeWorkoutIdx, setActiveWorkoutIdx] = useState(0);
   const [socials, setSocials] = useState<SocialLinks | null>(null);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -261,7 +570,20 @@ export default function Home() {
     };
     
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    let idleTimer: any;
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => setIsIdleLoaded(true));
+      } else {
+        idleTimer = setTimeout(() => setIsIdleLoaded(true), 1500);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (idleTimer) clearTimeout(idleTimer);
+    };
   }, []);
 
   // Footer visibility observer for floating bar
@@ -340,6 +662,7 @@ export default function Home() {
   // Smooth scroll handler
   const handleNavClick = (id: string) => {
     console.log("Navigating to:", id);
+    setIsIdleLoaded(true);
     setMobileMenuOpen(false);
     setTimeout(() => {
       const el = document.getElementById(id);
@@ -757,13 +1080,139 @@ export default function Home() {
                   VIEW MEMBERSHIPS
                 </button>
               </motion.div>
-
             </div>
           </section>
 
-          {/* Why Choose RAN Section */}
-          <section id="about" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden transition-colors duration-300">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {isIdleLoaded && (
+            <>
+              {/* Workout Preview Slider for Mobile (Visible on Mobile/Tablet ONLY) */}
+              <section className="block lg:hidden py-12 bg-zinc-100/50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
+                <div className="max-w-7xl mx-auto px-4 max-h-[600px] overflow-hidden">
+                  <div className="text-center max-w-3xl mx-auto mb-6 space-y-1">
+                    <span className="text-yellow-400 font-mono text-[10px] uppercase tracking-widest font-bold">PREVIEW WORKOUTS</span>
+                    <h2 className="font-display text-2xl font-black italic uppercase text-zinc-900 dark:text-white">
+                      WORKOUT BROWSER
+                    </h2>
+                  </div>
+
+                  {/* Scrollable Horizontal Category Tabs */}
+                  <div className="flex border-b border-zinc-200 dark:border-zinc-800 mb-5 overflow-x-auto scrollbar-none font-mono text-[11px] uppercase tracking-wider gap-2 pb-2">
+                    {homepageCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setActiveCategory(cat.id);
+                          setActiveWorkoutIdx(0);
+                        }}
+                        className={`px-3 py-1.5 border-b-2 font-bold transition-all whitespace-nowrap ${
+                          activeCategory === cat.id
+                            ? 'border-yellow-400 text-yellow-500'
+                            : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Slider for selected category ONLY */}
+                  {(() => {
+                    const categoryWorkouts = homepageWorkouts.filter(w => w.category === activeCategory);
+                    const w = categoryWorkouts[activeWorkoutIdx];
+                    if (!w) return null;
+
+                    return (
+                      <div className="relative max-w-sm mx-auto">
+                        <div className="flex items-center justify-between mb-3 text-[11px] font-mono">
+                          <span className="text-zinc-500 dark:text-zinc-400">
+                            Workout {activeWorkoutIdx + 1} of {categoryWorkouts.length}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setActiveWorkoutIdx((prev) => (prev === 0 ? categoryWorkouts.length - 1 : prev - 1))}
+                              className="p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-yellow-400 transition-colors"
+                            >
+                              ←
+                            </button>
+                            <button
+                              onClick={() => setActiveWorkoutIdx((prev) => (prev === categoryWorkouts.length - 1 ? 0 : prev + 1))}
+                              className="p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-yellow-400 transition-colors"
+                            >
+                              →
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Card Content (One mounted card in DOM) */}
+                        <motion.div
+                          key={w.id}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          className="rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-950 p-4 shadow-xl flex flex-col justify-between min-h-[300px]"
+                        >
+                          <div className="space-y-3">
+                            <div className="relative h-32 w-full overflow-hidden rounded-lg border border-zinc-155 dark:border-zinc-900">
+                              <img
+                                src={w.image}
+                                alt={w.name}
+                                className="w-full h-full object-cover grayscale opacity-80"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
+                              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                                <span className="rounded bg-yellow-400 text-black px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">
+                                  {w.difficulty}
+                                </span>
+                                <span className="text-white font-mono text-[9px] font-bold">
+                                  {w.duration}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <h3 className="font-display text-base font-black italic text-zinc-900 dark:text-white uppercase leading-tight">
+                                {w.name}
+                              </h3>
+                              <p className="text-zinc-650 dark:text-zinc-400 text-[11px] leading-relaxed line-clamp-2">
+                                {w.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-3 border-t border-zinc-150 dark:border-zinc-900/50 flex justify-between items-center text-[9px] font-mono text-zinc-550 dark:text-zinc-400">
+                            <span>Est. Burn: <strong className="text-yellow-500 dark:text-yellow-400">{w.calories}</strong></span>
+                            <button
+                              onClick={() => setMemberLoginOpen(true)}
+                              className="text-yellow-500 dark:text-yellow-450 hover:underline uppercase font-bold text-[10px]"
+                            >
+                              Start Routine →
+                            </button>
+                          </div>
+                        </motion.div>
+
+                        {/* Pagination Dots */}
+                        <div className="flex justify-center gap-1.5 mt-4">
+                          {categoryWorkouts.map((_, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setActiveWorkoutIdx(idx)}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                idx === activeWorkoutIdx ? 'w-4 bg-yellow-400' : 'w-1.5 bg-zinc-350 dark:bg-zinc-800'
+                              }`}
+                              aria-label={`Slide ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </section>
+
+              {/* Why Choose RAN Section */}
+              <section id="about" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden transition-colors duration-300">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
               <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
                 <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">WHY CHOOSE US</span>
@@ -1315,6 +1764,8 @@ export default function Home() {
 
             </div>
           </section>
+            </>
+          )}
 
           {/* Membership Plans */}
           <section id="plans" className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
@@ -1406,8 +1857,10 @@ export default function Home() {
             </div>
           </section>
 
-          {/* D. Event Board Section (Challenges & Zumba events) */}
-          {events.length > 0 && (
+          {isIdleLoaded && (
+            <>
+              {/* D. Event Board Section (Challenges & Zumba events) */}
+              {events.length > 0 && (
             <section className="py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
               <div className="max-w-7xl mx-auto px-4 sm:px-6">
                 
@@ -1681,10 +2134,12 @@ export default function Home() {
 
             </div>
           </section>
+            </>
+          )}
 
           {/* F. Hidden SEO Landing Blocks (Keyword-rich text sections for local searches) */}
-          <section className="bg-zinc-100 dark:bg-zinc-950 py-8 px-4 text-zinc-400 dark:text-zinc-800 select-none border-t border-zinc-200 dark:border-zinc-950">
-            <div className="max-w-7xl mx-auto text-[10px] font-mono text-zinc-600 dark:text-zinc-900 leading-normal text-justify">
+          <section className="bg-zinc-150 dark:bg-zinc-950 py-8 px-4 text-zinc-550 dark:text-zinc-400 select-none border-t border-zinc-200 dark:border-zinc-900">
+            <div className="max-w-7xl mx-auto text-[11px] font-mono text-zinc-700 dark:text-zinc-300 leading-relaxed text-justify overflow-visible min-h-fit break-words">
               <h5 className="font-bold uppercase mb-1">Local Business Schema Directory:</h5>
               <p>
                 Looking for the best gym in Habsiguda or a top-tier fitness center near Street 8 Hyderabad? RAN Fitness offers premium personal training, high-intensity CrossFit workouts, and lively Zumba classes near you. Equipped exclusively with professional Aerofit commercial strength, cardio, and functional training stations. Get fit under Vikram Ran and certified coaches. Access fat loss, muscle gain programs, and custom nutritional consultations. Serving Habsiguda, Nacharam, Tarnaka, and Ramanthapur fitness communities.

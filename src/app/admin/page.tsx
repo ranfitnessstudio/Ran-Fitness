@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/ui/logo';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
   Dumbbell, 
@@ -27,7 +28,8 @@ import {
   AlertTriangle,
   MessageSquare,
   Video,
-  KeyRound
+  KeyRound,
+  Menu
 } from 'lucide-react';
 import { db, Trainer, Equipment, MembershipPlan, Transformation, WebsiteSettings, Lead, SocialLinks, GymEvent, CareerApplication, AiMetric, AiProviderStatus, Member, MemberProgress, WorkoutDay, Announcement, Attendance, VirtualTour } from '@/lib/database';
 import { CloudinaryUpload } from '@/components/ui/cloudinary-upload';
@@ -199,6 +201,7 @@ export default function AdminDashboard() {
 
   // Daily check-in viewer date
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Analytics & Attendance Hub states
   const [allAttendanceLogs, setAllAttendanceLogs] = useState<Attendance[]>([]);
@@ -1232,9 +1235,87 @@ ${xmlRows}
 
   return (
     <div className="flex h-screen bg-zinc-100 dark:bg-[#08080a] text-zinc-900 dark:text-white overflow-hidden transition-colors duration-300">
+      {/* Mobile Sidebar Drawer Navigation */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            {/* Drawer */}
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'tween', duration: 0.25 }}
+              className="relative z-10 w-72 max-w-[80vw] bg-white dark:bg-zinc-950 p-5 flex flex-col justify-between overflow-y-auto border-r border-zinc-200 dark:border-zinc-900 transition-colors"
+            >
+              <div className="space-y-6">
+                <div className="flex justify-between items-center pb-4 border-b border-zinc-100 dark:border-zinc-900">
+                  <div className="flex flex-col gap-1 items-start select-none">
+                    <Logo size={24} variant="full" />
+                    <span className="text-[8px] font-mono text-zinc-400 dark:text-zinc-650 tracking-wider uppercase pl-1 block">CMS Panel V1.2</span>
+                  </div>
+                  <button onClick={() => setMobileMenuOpen(false)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-white p-1">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <nav className="flex flex-col gap-1 font-mono text-[10px] uppercase tracking-wider overflow-y-auto max-h-[65vh] scrollbar-none">
+                  {[
+                    { id: 'dashboard', label: 'Overview', icon: <TrendingUp size={13} /> },
+                    { id: 'analytics', label: 'Analytics Hub', icon: <Activity size={13} /> },
+                    { id: 'members', label: 'Gym Members', icon: <Users size={13} /> },
+                    { id: 'leads', label: 'Captured Leads', icon: <Users size={13} /> },
+                    { id: 'careers', label: 'Hiring Apps', icon: <Briefcase size={13} /> },
+                    { id: 'events', label: 'Event Boards', icon: <Calendar size={13} /> },
+                    { id: 'trainers', label: 'Trainers List', icon: <Plus size={13} /> },
+                    { id: 'equipment', label: 'Aerofit Gear', icon: <Dumbbell size={13} /> },
+                    { id: 'plans', label: 'Pricing Plans', icon: <FileText size={13} /> },
+                    { id: 'transformations', label: 'Transformations', icon: <Camera size={13} /> },
+                    { id: 'virtualtour', label: 'Virtual Tour', icon: <Video size={13} /> },
+                    { id: 'settings', label: 'Settings Editor', icon: <Settings size={13} /> },
+                    { id: 'ai', label: 'Zeus AI Monitor', icon: <MessageSquare size={13} /> },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-left font-bold transition-all cursor-pointer ${
+                        activeTab === tab.id
+                          ? 'bg-yellow-400 text-black shadow-md'
+                          : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white'
+                      }`}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-left font-mono text-[10px] uppercase tracking-wider text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/20 transition-all font-bold mt-4 cursor-pointer"
+              >
+                <LogOut size={13} />
+                Exit CMS
+              </button>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
+  
       
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-900 flex flex-col justify-between p-6 overflow-y-auto transition-colors duration-300">
+      <aside className="hidden lg:flex w-64 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-900 flex flex-col justify-between p-6 overflow-y-auto transition-colors duration-300">
         <div className="space-y-8">
           <div className="flex flex-col gap-1 items-start select-none">
             <Logo size={28} variant="full" />
@@ -1285,7 +1366,28 @@ ${xmlRows}
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden bg-zinc-50 dark:bg-[#0c0c0e]">
         
-        <header className="bg-white dark:bg-zinc-950 px-8 py-5 border-b border-zinc-200 dark:border-zinc-900 flex items-center justify-between transition-colors duration-300">
+        {/* Sticky Mobile Admin Header */}
+        <header className="sticky top-0 z-40 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-900 flex lg:hidden items-center justify-between px-4 py-3 transition-colors duration-300">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white"
+            >
+              <Menu size={20} />
+            </button>
+            <Logo size={22} variant="symbol" />
+            <h1 className="font-display text-[11px] font-black italic tracking-wider text-yellow-500 dark:text-yellow-400 uppercase truncate max-w-[140px] xs:max-w-none">
+              RAN CMS: {activeTab}
+            </h1>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" title="System Online" />
+            <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
+          </div>
+        </header>
+
+        {/* Desktop Header */}
+        <header className="hidden lg:flex bg-white dark:bg-zinc-950 px-8 py-5 border-b border-zinc-200 dark:border-zinc-900 items-center justify-between transition-colors duration-300">
           <h2 className="font-display text-lg font-black italic tracking-wider text-yellow-500 dark:text-yellow-400 uppercase">
             {activeTab} Management Panel
           </h2>
@@ -1303,7 +1405,7 @@ ${xmlRows}
         </header>
 
         {/* Tab display */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24 lg:pb-8">
           
           {/* OVERVIEW DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
@@ -1344,7 +1446,7 @@ ${xmlRows}
 
                 return (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                       {/* Card 1: Total Registered */}
                       <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 relative overflow-hidden group hover:border-yellow-400/30 transition-all duration-300 shadow-md flex flex-col justify-between min-h-[110px]">
                         <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500" />
@@ -1687,7 +1789,7 @@ ${xmlRows}
                 </div>
 
                 {/* Website Visitor Analytics */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-xl p-5 space-y-2 transition-all">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono block">Total Visitors</span>
                     <div className="text-2xl font-black italic text-blue-500 dark:text-blue-400 font-display">{visitorAnalytics.totalVisitors}</div>
@@ -1992,7 +2094,8 @@ ${xmlRows}
                 </div>
                 
                 <div className="overflow-x-auto text-[11px] font-mono">
-                  <table className="w-full text-left">
+                  {/* Desktop view */}
+                  <table className="hidden md:table w-full text-left">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-900 text-zinc-400 pb-2 uppercase tracking-wider">
                         <th className="pb-2">Member ID</th>
@@ -2181,7 +2284,8 @@ ${xmlRows}
                   </h4>
 
                   <div className="overflow-x-auto text-[10px] font-mono">
-                    <table className="w-full text-left">
+                    {/* Desktop view */}
+                    <table className="hidden md:table w-full text-left">
                       <thead>
                         <tr className="border-b border-zinc-200 dark:border-zinc-900 text-zinc-400 pb-1.5 uppercase">
                           <th className="pb-1.5">Day</th>
@@ -2206,6 +2310,24 @@ ${xmlRows}
                         ))}
                       </tbody>
                     </table>
+
+                    {/* Mobile View Cards */}
+                    <div className="block md:hidden space-y-3">
+                      {workoutSchedule.map((w) => (
+                        <div key={w.day} className="bg-zinc-950 p-3 border border-zinc-900 rounded-lg flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-bold text-yellow-500 font-mono block">{w.day}</span>
+                            <span className="font-sans text-white text-[11px] block">{w.title}</span>
+                          </div>
+                          <button
+                            onClick={() => setWorkoutScheduleEditing(w)}
+                            className="text-yellow-500 hover:text-yellow-400 font-bold uppercase text-[9px] font-mono border border-zinc-800 rounded px-2.5 py-1.5"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -2283,7 +2405,7 @@ ${xmlRows}
           {activeTab === 'leads' && (
             <div className="space-y-6">
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-5 space-y-2">
                   <span className="text-[10px] text-zinc-500 uppercase font-mono block">Total Leads Captured</span>
                   <div className="text-2xl font-black italic text-yellow-400 font-display">{leads.length}</div>
@@ -2332,7 +2454,8 @@ ${xmlRows}
 
               {/* Leads Table */}
               <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl overflow-hidden shadow-xl">
-                <table className="w-full text-left border-collapse text-xs">
+                {/* Desktop View */}
+                <table className="hidden lg:table w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono border-b border-zinc-200 dark:border-zinc-800 uppercase text-[10px]">
                       <th className="p-4 font-bold">Priority</th>
@@ -2406,6 +2529,75 @@ ${xmlRows}
                     )}
                   </tbody>
                 </table>
+
+                {/* Mobile Leads view */}
+                <div className="block lg:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
+                  {leads.map((lead) => (
+                    <div key={lead.id} className="p-4 bg-zinc-950/20 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-zinc-900 dark:text-white text-sm">{lead.name}</h4>
+                          <span className="text-[10px] text-zinc-400 font-mono select-all block mt-0.5">{lead.phone}</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
+                          lead.priority === 'Hot Lead 🔥' 
+                            ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
+                            : lead.priority === 'Warm Lead 🟡'
+                              ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
+                              : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-600 dark:text-zinc-400'
+                        }`}>
+                          {lead.priority}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-500 font-mono">
+                        <div>
+                          <span className="text-[8px] text-zinc-600 uppercase block font-bold">Goal Target</span>
+                          <span>{lead.goal}</span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-zinc-600 uppercase block font-bold">Preferred Slot</span>
+                          <span>{lead.preferred_time}</span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-zinc-600 uppercase block font-bold">Source</span>
+                          <span className="text-yellow-500 font-bold uppercase">{lead.source}</span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-zinc-600 uppercase block font-bold">Date</span>
+                          <span>{new Date(lead.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-between items-center gap-3">
+                        <button
+                          onClick={() => toggleLeadStatus(lead.id, lead.status)}
+                          className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+                            lead.status === 'Joined' 
+                              ? 'bg-green-950/40 border-green-500/20 text-green-400' 
+                              : lead.status === 'Contacted'
+                                ? 'bg-blue-950/40 border-blue-500/20 text-blue-400'
+                                : 'bg-yellow-950/40 border-yellow-500/20 text-yellow-400'
+                          }`}
+                        >
+                          <Clock size={12} />
+                          {lead.status}
+                        </button>
+                        <button
+                          onClick={() => deleteLead(lead.id)}
+                          className="bg-zinc-900 border border-zinc-800 hover:border-red-505 hover:text-red-500 rounded-lg p-2 text-zinc-400 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {leads.length === 0 && (
+                    <div className="p-8 text-center text-zinc-600 font-mono text-xs">
+                      No gym leads registered in the database yet.
+                    </div>
+                  )}
+                </div>
               </div>
 
             </div>
@@ -2417,7 +2609,8 @@ ${xmlRows}
               <span className="text-zinc-400 text-xs font-mono block mb-4">Review applicant profiles for gym staff hiring.</span>
 
               <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl overflow-hidden shadow-xl">
-                <table className="w-full text-left border-collapse text-xs">
+                {/* Desktop View */}
+                <table className="hidden md:table w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono border-b border-zinc-200 dark:border-zinc-800 uppercase text-[10px]">
                       <th className="p-4 font-bold">Applicant Name</th>
@@ -2461,6 +2654,43 @@ ${xmlRows}
                     )}
                   </tbody>
                 </table>
+
+                {/* Mobile Careers view */}
+                <div className="block md:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
+                  {careers.map((app) => (
+                    <div key={app.id} className="p-4 bg-zinc-950/20 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-zinc-900 dark:text-white text-sm">{app.name}</h4>
+                          <span className="text-[10px] text-zinc-400 font-mono select-all block mt-0.5">{app.phone}</span>
+                        </div>
+                        <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 rounded text-[9px] font-mono text-yellow-600 dark:text-yellow-400 font-bold uppercase animate-pulse">
+                          {app.role}
+                        </span>
+                      </div>
+                      
+                      <div className="text-[10px] text-zinc-500 font-mono space-y-1">
+                        <span className="text-[8px] text-zinc-650 uppercase block font-bold">Experience & Qualifications</span>
+                        <p className="text-zinc-300 font-sans leading-relaxed">{app.experience}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
+                        <span className="text-zinc-600">Submitted: {new Date(app.created_at).toLocaleDateString()}</span>
+                        <button
+                          onClick={() => deleteCareerApp(app.id)}
+                          className="bg-zinc-900 border border-zinc-800 hover:border-red-500 hover:text-red-500 rounded-lg p-2 text-zinc-400 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {careers.length === 0 && (
+                    <div className="p-8 text-center text-zinc-600 font-mono text-xs">
+                      No job applications submitted yet.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -2585,7 +2815,8 @@ ${xmlRows}
               </div>
 
               <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl overflow-hidden shadow-xl">
-                <table className="w-full text-left border-collapse text-xs">
+                {/* Desktop View */}
+                <table className="hidden lg:table w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono border-b border-zinc-200 dark:border-zinc-800 uppercase text-[10px]">
                       <th className="p-4 font-bold">Equipment Name</th>
@@ -2626,6 +2857,53 @@ ${xmlRows}
                     ))}
                   </tbody>
                 </table>
+
+                {/* Mobile Equipment view */}
+                <div className="block lg:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
+                  {equipment.map((eq) => (
+                    <div key={eq.id} className="p-4 bg-zinc-950/20 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-zinc-900 dark:text-white text-sm">{eq.name}</h4>
+                          <span className="text-[10px] text-zinc-400 font-mono block mt-0.5">{eq.brand}</span>
+                        </div>
+                        <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 rounded text-[9px] font-mono text-yellow-600 dark:text-yellow-400 font-bold uppercase">
+                          {eq.category}
+                        </span>
+                      </div>
+                      
+                      <div className="text-[10px] text-zinc-500 space-y-1">
+                        <span className="text-[8px] text-zinc-650 uppercase block font-mono font-bold">Description</span>
+                        <p className="text-zinc-300 font-sans leading-relaxed">{eq.description}</p>
+                      </div>
+                      
+                      <div className="text-[10px] text-zinc-500 space-y-1">
+                        <span className="text-[8px] text-zinc-650 uppercase block font-mono font-bold">Specifications</span>
+                        <p className="text-zinc-300 font-mono leading-relaxed">{eq.spec_details}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-zinc-900 flex justify-end gap-3">
+                        <button
+                          onClick={() => setEditingEquipment(eq)}
+                          className="bg-zinc-900 border border-zinc-800 hover:border-yellow-450 hover:text-yellow-400 rounded-lg p-2 text-zinc-400 transition-colors"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          onClick={() => deleteEquipment(eq.id)}
+                          className="bg-zinc-900 border border-zinc-800 hover:border-red-500 hover:text-red-500 rounded-lg p-2 text-zinc-400 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {equipment.length === 0 && (
+                    <div className="p-8 text-center text-zinc-600 font-mono text-xs">
+                      No station gear registered yet.
+                    </div>
+                  )}
+                </div>
               </div>
 
             </div>
@@ -3378,7 +3656,8 @@ ${xmlRows}
                     Recent Telemetry Logs (Last 10 Queries)
                   </h4>
                   <div className="overflow-x-auto text-[10px] font-mono">
-                    <table className="w-full text-left">
+                    {/* Desktop View */}
+                    <table className="hidden md:table w-full text-left">
                       <thead>
                         <tr className="border-b border-zinc-200 dark:border-zinc-900 text-zinc-400 pb-2 uppercase tracking-wider">
                           <th className="pb-2">Timestamp</th>
@@ -3434,6 +3713,46 @@ ${xmlRows}
                         )}
                       </tbody>
                     </table>
+
+                    {/* Mobile AI Logs view */}
+                    <div className="block md:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
+                      {aiMetrics.slice(0, 10).map((m, index) => {
+                        const dateStr = new Date(m.created_at).toLocaleString('en-IN', {
+                          timeZone: 'Asia/Kolkata',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        });
+                        return (
+                          <div key={m.id || index} className="py-3 bg-zinc-950/20 space-y-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono text-zinc-550">{dateStr}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                m.provider === 'groq' 
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400' 
+                                  : m.provider === 'gemini' 
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400' 
+                                    : 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400'
+                              }`}>
+                                {m.provider}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] font-mono">
+                              <span>Time: <strong className="text-white">{m.response_time_ms} ms</strong></span>
+                              <span>Status: <strong className={m.success ? 'text-green-500' : 'text-red-500'}>{m.success ? 'SUCCESS' : 'FAILED'}</strong></span>
+                            </div>
+                            <div className="text-[10px] text-zinc-500 truncate" title={m.error_message}>
+                              Error: {m.error_message || 'None'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {aiMetrics.length === 0 && (
+                        <div className="p-6 text-center text-zinc-500 text-xs">
+                          No telemetry logs found.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4751,6 +5070,29 @@ ${xmlRows}
           </div>
         </div>
       )}
+
+      {/* Mobile Fixed Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden h-16 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-lg border-t border-zinc-200 dark:border-zinc-900 flex items-center justify-around px-4 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] transition-all">
+        {[
+          { id: 'dashboard', label: 'Overview', icon: <TrendingUp size={16} /> },
+          { id: 'members', label: 'Members', icon: <Users size={16} /> },
+          { id: 'analytics', label: 'Analytics', icon: <Activity size={16} /> },
+          { id: 'settings', label: 'Settings', icon: <Settings size={16} /> },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 text-center font-mono text-[9px] uppercase tracking-wider font-bold transition-all duration-200 cursor-pointer ${
+              activeTab === item.id
+                ? 'text-yellow-500 dark:text-yellow-400 scale-105'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Toast Notification */}
       {showToast && (

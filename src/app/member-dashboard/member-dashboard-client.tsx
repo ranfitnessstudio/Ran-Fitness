@@ -25,7 +25,8 @@ import {
   Send,
   Bot,
   Check,
-  Copy
+  Copy,
+  X
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { db, Member, MemberProgress, WorkoutDay, Announcement, Attendance } from '@/lib/database';
@@ -62,6 +63,340 @@ const generateChatId = (sender: string) => {
   return `${sender}_${Date.now()}_${chatCounter}`;
 };
 
+const dashboardCategories = [
+  { id: "Strength Training", label: "🏋️ Strength Training" },
+  { id: "HIIT & Cardio", label: "🏃 HIIT & Cardio" },
+  { id: "Functional Fitness", label: "🤸 Functional Fitness" },
+  { id: "Fat Loss Special", label: "🔥 Fat Loss Special" },
+  { id: "Muscle Gain", label: "💪 Muscle Gain" },
+  { id: "Mobility & Flex", label: "🧘 Mobility & Flex" },
+  { id: "Recovery & Yoga", label: "🌱 Recovery & Yoga" }
+];
+
+const dashboardWorkouts = [
+  // Strength Training
+  {
+    id: "str_1",
+    name: "Full Body Power Hypertrophy",
+    category: "Strength Training",
+    duration: "45 mins",
+    difficulty: "Advanced",
+    calories: "450 kcal",
+    description: "High load compound movements targeting major muscle groups for maximum hypertrophic response.",
+    image: "/images/back_muscle_traps.png",
+    exercises: ["Barbell Squats: 4 sets x 8 reps", "Bench Press: 4 sets x 8 reps", "Deadlifts: 3 sets x 5 reps", "Overhead Press: 3 sets x 10 reps"]
+  },
+  {
+    id: "str_2",
+    name: "Push Day Strength Focus",
+    category: "Strength Training",
+    duration: "50 mins",
+    difficulty: "Intermediate",
+    calories: "400 kcal",
+    description: "Heavy bench press, overhead press, and tricep extensions.",
+    image: "/images/male_athlete.png",
+    exercises: ["Incline DB Press: 3 sets x 10 reps", "Dips: 3 sets x max reps", "Lateral Raises: 4 sets x 12 reps", "Tricep Pushdowns: 3 sets x 15 reps"]
+  },
+  {
+    id: "str_3",
+    name: "Pull Day Back Builder",
+    category: "Strength Training",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "380 kcal",
+    description: "Focusing on rows, pull-ups, and deadlifts for a strong back.",
+    image: "/images/back_muscle_traps.png",
+    exercises: ["Pull-Ups: 4 sets x 8 reps", "Barbell Rows: 3 sets x 10 reps", "Lat Pulldowns: 3 sets x 12 reps", "Face Pulls: 4 sets x 15 reps"]
+  },
+  {
+    id: "str_4",
+    name: "Lower Body Compound Builder",
+    category: "Strength Training",
+    duration: "60 mins",
+    difficulty: "Advanced",
+    calories: "550 kcal",
+    description: "Squats, lunges, and leg presses for lower body foundation.",
+    image: "/images/male_athlete.png",
+    exercises: ["Leg Press: 4 sets x 10 reps", "Romanian Deadlifts: 3 sets x 10 reps", "Bulgarian Split Squats: 3 sets x 8 reps each", "Calf Raises: 4 sets x 15 reps"]
+  },
+
+  // HIIT & Cardio
+  {
+    id: "cardio_1",
+    name: "Metabolic Conditioning (MetCon)",
+    category: "HIIT & Cardio",
+    duration: "30 mins",
+    difficulty: "Intermediate",
+    calories: "500 kcal",
+    description: "Short high-intensity intervals followed by active rest periods.",
+    image: "/images/female_athlete.png",
+    exercises: ["Burpees: 45s work, 15s rest", "Kettlebell Swings: 45s work, 15s rest", "Thrusters: 45s work, 15s rest", "Rowing Machine: 45s work, 15s rest"]
+  },
+  {
+    id: "cardio_2",
+    name: "Zumba Dance Cardio",
+    category: "HIIT & Cardio",
+    duration: "45 mins",
+    difficulty: "Beginner",
+    calories: "350 kcal",
+    description: "High-tempo rhythmic dance workout led by our top dance coaches.",
+    image: "/images/female_athlete.png",
+    exercises: ["Latin Warmup: 5 mins", "High Tempo Zumba Tracks: 35 mins", "Cool Down & Stretch: 5 mins"]
+  },
+  {
+    id: "cardio_3",
+    name: "Tabata Shred Protocol",
+    category: "HIIT & Cardio",
+    duration: "20 mins",
+    difficulty: "Advanced",
+    calories: "300 kcal",
+    description: "20s on, 10s off classic Tabata format to push anaerobic capacity.",
+    image: "/images/female_athlete.png",
+    exercises: ["Sprint Intervals: 8 rounds", "Jump Squats: 8 rounds", "Mountain Climbers: 8 rounds", "Pushups: 8 rounds"]
+  },
+  {
+    id: "cardio_4",
+    name: "Stair Climber Interval Burn",
+    category: "HIIT & Cardio",
+    duration: "25 mins",
+    difficulty: "Intermediate",
+    calories: "380 kcal",
+    description: "Intense lower body cardiovascular engine builder using high speed stairs.",
+    image: "/images/male_athlete.png",
+    exercises: ["Warmup: 5 mins Level 5", "High Intensity: 1 min Level 12", "Low Recovery: 1 min Level 6", "Repeat for 10 rounds"]
+  },
+
+  // Functional Fitness
+  {
+    id: "func_1",
+    name: "CrossFit Hybrid Circuit",
+    category: "Functional Fitness",
+    duration: "45 mins",
+    difficulty: "Advanced",
+    calories: "480 kcal",
+    description: "Olympic lifts, box jumps, and kettlebell swings combined.",
+    image: "/images/male_athlete.png",
+    exercises: ["Clean & Press: 5 sets x 5 reps", "Box Jumps: 3 sets x 15 reps", "Wall Balls: 3 sets x 20 reps", "Toes-to-Bar: 3 sets x max reps"]
+  },
+  {
+    id: "func_2",
+    name: "Core & Stability Flow",
+    category: "Functional Fitness",
+    duration: "30 mins",
+    difficulty: "Beginner",
+    calories: "220 kcal",
+    description: "Focusing on deep core activation, balance, and single-leg stability.",
+    image: "/images/female_athlete.png",
+    exercises: ["Planks: 3 sets x 60 seconds", "Bird Dog: 3 sets x 12 reps", "Deadbugs: 3 sets x 15 reps", "Single-leg Romanian Deadlifts: 3 sets x 8 reps"]
+  },
+  {
+    id: "func_3",
+    name: "Kettlebell Power Flow",
+    category: "Functional Fitness",
+    duration: "35 mins",
+    difficulty: "Intermediate",
+    calories: "340 kcal",
+    description: "Full body ballistic movements with kettlebells for endurance.",
+    image: "/images/male_athlete.png",
+    exercises: ["KB Swings: 4 sets x 20 reps", "KB Goblet Squats: 3 sets x 12 reps", "KB Snatch: 3 sets x 8 reps each arm", "Turkish Get-up: 3 sets x 3 reps each arm"]
+  },
+  {
+    id: "func_4",
+    name: "Sled Pushes & Battle Ropes",
+    category: "Functional Fitness",
+    duration: "30 mins",
+    difficulty: "Advanced",
+    calories: "420 kcal",
+    description: "High power, low impact functional strength conditioning circuit.",
+    image: "/images/back_muscle_traps.png",
+    exercises: ["Sled Push (Heavy): 4 rounds x 25m", "Battle Ropes: 4 rounds x 30s slam", "Farmers Walk: 4 rounds x 50m", "Medicine Ball Slams: 4 sets x 15 reps"]
+  },
+
+  // Fat Loss Special
+  {
+    id: "fat_1",
+    name: "LISS Fat Burning Cardio",
+    category: "Fat Loss Special",
+    duration: "50 mins",
+    difficulty: "Beginner",
+    calories: "380 kcal",
+    description: "Low-intensity steady state exercise optimized for fat oxidation.",
+    image: "/images/female_athlete.png",
+    exercises: ["Treadmill Incline Walk: 40 mins (Incline 12%, Speed 4.5km/h)", "Cool Down: 10 mins easy walk"]
+  },
+  {
+    id: "fat_2",
+    name: "High-Intensity Fat Shred",
+    category: "Fat Loss Special",
+    duration: "35 mins",
+    difficulty: "Advanced",
+    calories: "460 kcal",
+    description: "Full body plyometrics and metabolic acceleration circuit.",
+    image: "/images/male_athlete.png",
+    exercises: ["Burpee to Broad Jump: 3 sets x 10 reps", "Jumping Lunges: 3 sets x 20 reps", "Double Unders: 3 sets x 50 reps", "Shadow Boxing: 3 rounds x 3 mins"]
+  },
+  {
+    id: "fat_3",
+    name: "Abs & Cardio Burner",
+    category: "Fat Loss Special",
+    duration: "30 mins",
+    difficulty: "Intermediate",
+    calories: "280 kcal",
+    description: "Core-focused circuits interleaved with dynamic cardio blasts.",
+    image: "/images/female_athlete.png",
+    exercises: ["Hanging Leg Raises: 3 sets x 12 reps", "Russian Twists (weighted): 3 sets x 30 reps", "Bicycle Crunches: 3 sets x 25 reps", "Jump Rope: 3 rounds x 3 mins"]
+  },
+  {
+    id: "fat_4",
+    name: "Rowing Machine Fat Burn",
+    category: "Fat Loss Special",
+    duration: "40 mins",
+    difficulty: "Intermediate",
+    calories: "450 kcal",
+    description: "Low impact, high calorie expenditure rowing program.",
+    image: "/images/male_athlete.png",
+    exercises: ["Steady Row: 10 mins", "Sprint Row (90% effort): 1 min", "Active Rest Row: 1 min", "Repeat sprints: 10 rounds", "Cool down: 10 mins"]
+  },
+
+  // Muscle Gain
+  {
+    id: "gain_1",
+    name: "Arms & Shoulder Pump",
+    category: "Muscle Gain",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "320 kcal",
+    description: "High volume isolation curls, extensions, and lateral raises.",
+    image: "/images/male_athlete.png",
+    exercises: ["Bicep DB Curls: 4 sets x 12 reps", "Tricep Skull Crushers: 4 sets x 12 reps", "DB Lateral Raises: 4 sets x 15 reps", "Hammer Curls: 3 sets x 12 reps"]
+  },
+  {
+    id: "gain_2",
+    name: "Chest & Back Super-sets",
+    category: "Muscle Gain",
+    duration: "50 mins",
+    difficulty: "Advanced",
+    calories: "420 kcal",
+    description: "Agonist-antagonist super-sets for maximum blood flow and pump.",
+    image: "/images/back_muscle_traps.png",
+    exercises: ["Super-set 1: DB Bench Press + Lat Pulldown (4 sets x 10 reps)", "Super-set 2: Cable Flys + Cable Rows (3 sets x 12 reps)", "Pushups to failure: 2 sets"]
+  },
+  {
+    id: "gain_3",
+    name: "Leg Hypertrophy Focus",
+    category: "Muscle Gain",
+    duration: "55 mins",
+    difficulty: "Intermediate",
+    calories: "480 kcal",
+    description: "Targeting quads and hamstrings with controlled isolation lifts.",
+    image: "/images/male_athlete.png",
+    exercises: ["Leg Extensions: 4 sets x 15 reps", "Lying Leg Curls: 4 sets x 15 reps", "Goblet Squats (Tempo): 3 sets x 12 reps (3s eccentric)", "Walking DB Lunges: 3 sets x 12 steps each leg"]
+  },
+  {
+    id: "gain_4",
+    name: "Shoulder Hypertrophy",
+    category: "Muscle Gain",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "310 kcal",
+    description: "High-volume shoulder capping routine to create the perfect V-taper.",
+    image: "/images/male_athlete.png",
+    exercises: ["Overhead DB Press: 4 sets x 10 reps", "Arnold Press: 3 sets x 12 reps", "Bent-over Rear Delt Raise: 4 sets x 15 reps", "DB Shrugs: 3 sets x 12 reps"]
+  },
+
+  // Mobility & Flex
+  {
+    id: "mob_1",
+    name: "Hips & Hamstring Release",
+    category: "Mobility & Flex",
+    duration: "25 mins",
+    difficulty: "Beginner",
+    calories: "120 kcal",
+    description: "Gentle mobility exercises to release tight hip flexors and lower back.",
+    image: "/images/female_athlete.png",
+    exercises: ["90/90 Hip Stretch: 3 mins each side", "Couch Stretch: 2 mins each side", "Hamstring Flossing: 10 reps each leg", "World's Greatest Stretch: 8 reps each side"]
+  },
+  {
+    id: "mob_2",
+    name: "Thoracic Spine Mobility",
+    category: "Mobility & Flex",
+    duration: "20 mins",
+    difficulty: "Beginner",
+    calories: "90 kcal",
+    description: "Focus on upper back rotation, chest opening, and posture correction.",
+    image: "/images/female_athlete.png",
+    exercises: ["Cat-Cow: 15 reps", "T-Spine Rotation on all fours: 10 reps each side", "Thread the Needle: 5 deep breaths each side", "Doorway Chest Stretch: 2 mins"]
+  },
+  {
+    id: "mob_3",
+    name: "Full Body Mobility Flow",
+    category: "Mobility & Flex",
+    duration: "30 mins",
+    difficulty: "Intermediate",
+    calories: "150 kcal",
+    description: "Dynamic stretching routine to improve joint range of motion.",
+    image: "/images/female_athlete.png",
+    exercises: ["Deep Squat Hold: 2 mins", "Spiderman Lunge with Twist: 10 reps", "Inchworms: 8 reps", "Ankle Mobilitiy Drill: 15 reps each side"]
+  },
+  {
+    id: "mob_4",
+    name: "Shoulder Health Protocol",
+    category: "Mobility & Flex",
+    duration: "15 mins",
+    difficulty: "Beginner",
+    calories: "80 kcal",
+    description: "Rotator cuff strengthening and overhead mobility drill.",
+    image: "/images/female_athlete.png",
+    exercises: ["Bandy Dislocates: 15 reps", "Scapular Pull-ups: 3 sets x 10 reps", "Wall Slides: 3 sets x 12 reps", "Sleeper Stretch: 1 min each side"]
+  },
+
+  // Recovery & Yoga
+  {
+    id: "rec_1",
+    name: "Decompression & Stretch",
+    category: "Recovery & Yoga",
+    duration: "30 mins",
+    difficulty: "Beginner",
+    calories: "100 kcal",
+    description: "Post-workout recovery routine for optimal muscle recovery.",
+    image: "/images/back_muscle_traps.png",
+    exercises: ["Child's Pose: 2 mins", "Pigeon Pose: 2 mins each side", "Lying Spinal Twist: 2 mins each side", "Cobra Stretch: 1 min"]
+  },
+  {
+    id: "rec_2",
+    name: "Vinyasa Flow Yoga",
+    category: "Recovery & Yoga",
+    duration: "45 mins",
+    difficulty: "Intermediate",
+    calories: "180 kcal",
+    description: "Mindful breathing and active yoga poses for mind-body balance.",
+    image: "/images/female_athlete.png",
+    exercises: ["Sun Salutation A: 5 rounds", "Warrior Sequence: 15 mins", "Balance Poses (Tree, Eagle): 10 mins", "Savasana: 5 mins"]
+  },
+  {
+    id: "rec_3",
+    name: "Deep Relaxation & Yin",
+    category: "Recovery & Yoga",
+    duration: "40 mins",
+    difficulty: "Beginner",
+    calories: "80 kcal",
+    description: "Long-held passive poses to stretch deep connective tissues.",
+    image: "/images/back_muscle_traps.png",
+    exercises: ["Butterfly Pose: 4 mins hold", "Sphinx Pose: 3 mins hold", "Dragonfly Pose: 4 mins hold", "Supported Bridge: 3 mins"]
+  },
+  {
+    id: "rec_4",
+    name: "Active Foam Rolling Flow",
+    category: "Recovery & Yoga",
+    duration: "20 mins",
+    difficulty: "Beginner",
+    calories: "90 kcal",
+    description: "Self-myofascial release flow targeting tight muscles and knots.",
+    image: "/images/male_athlete.png",
+    exercises: ["Foam Roll Quads: 2 mins", "Foam Roll Lats: 2 mins each side", "Foam Roll Upper Back: 3 mins", "Foam Roll Calves: 2 mins each side"]
+  }
+];
+
 export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   member,
   initialProgress,
@@ -80,9 +415,13 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const router = useRouter();
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'diet' | 'coach'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'diet' | 'coach' | 'workouts'>('dashboard');
 
   // Database States
+    const [activeIndices, setActiveIndices] = useState<Record<string, number>>({});
+  const [activeWorkoutCategory, setActiveWorkoutCategory] = useState("Strength Training");
+  const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
+  const [selectedCategoryMore, setSelectedCategoryMore] = useState<string | null>(null);
   const [progressList, setProgressList] = useState<MemberProgress[]>(initialProgress);
   const [attendanceList, setAttendanceList] = useState<Attendance[]>(initialAttendance);
   const [goalData, setGoalData] = useState<any>(initialGoal);
@@ -762,6 +1101,59 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
     ringColor = 'stroke-red-500';
   }
 
+    // Swipe and Carousel helpers for Workouts tab
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = (category: string) => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const minSwipeDistance = 50;
+    if (distance > minSwipeDistance) {
+      handleNextCard(category);
+    } else if (distance < -minSwipeDistance) {
+      handlePrevCard(category);
+    }
+  };
+
+  const handlePrevCard = (category: string) => {
+    const list = dashboardWorkouts.filter(w => w.category === category);
+    setActiveIndices(prev => ({
+      ...prev,
+      [category]: prev[category] === 0 ? list.length - 1 : (prev[category] || 0) - 1
+    }));
+  };
+
+  const handleNextCard = (category: string) => {
+    const list = dashboardWorkouts.filter(w => w.category === category);
+    setActiveIndices(prev => ({
+      ...prev,
+      [category]: (prev[category] || 0) === list.length - 1 ? 0 : (prev[category] || 0) + 1
+    }));
+  };
+
+  const getVirtualizedWorkouts = (category: string) => {
+    const all = dashboardWorkouts.filter(w => w.category === category);
+    const activeIdx = activeIndices[category] ?? 0;
+    const prevIdx = activeIdx === 0 ? all.length - 1 : activeIdx - 1;
+    const nextIdx = activeIdx === all.length - 1 ? 0 : activeIdx + 1;
+    const indices = Array.from(new Set([prevIdx, activeIdx, nextIdx]));
+    return indices.map(idx => ({
+      ...all[idx],
+      originalIndex: idx,
+      isActive: idx === activeIdx
+    }));
+  };
+
   // Pre-filled WhatsApp message
   const waPhone = settings?.contact_phone || '9666345644';
   const waText = `Hello RAN Fitness,\nI would like to renew my membership.\nMember ID: ${member.member_id}`;
@@ -845,6 +1237,7 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
           {[
             { id: 'dashboard', label: '🏠 Dashboard' },
             { id: 'analytics', label: '📊 Body Analytics' },
+            { id: 'workouts', label: '🏋️ Workouts' },
             { id: 'diet', label: '🥗 Diet & Notes' },
             { id: 'coach', label: '🤖 Coach Zeus' }
           ].map(tab => (
@@ -1764,7 +2157,401 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
 
         </div>
 
+
+          {activeTab === 'workouts' && (
+            <div className="space-y-6 animate-fade-in pb-16">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800 pb-5">
+                <div>
+                  <h2 className="font-display text-2xl font-black italic uppercase text-white tracking-wide">
+                    Workout Library
+                  </h2>
+                  <p className="text-xs text-zinc-400 font-mono mt-1">
+                    Select a category to view high-performance training structures.
+                  </p>
+                </div>
+              </div>
+
+              {/* Mobile scrollable category selector tabs */}
+              <div className="block lg:hidden">
+                <div className="flex border-b border-zinc-800 mb-5 overflow-x-auto scrollbar-none font-mono text-[11px] uppercase tracking-wider gap-2 pb-2">
+                  {dashboardCategories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveWorkoutCategory(cat.id)}
+                      className={`px-3 py-1.5 border-b-2 font-bold transition-all whitespace-nowrap ${
+                        activeWorkoutCategory === cat.id
+                          ? 'border-yellow-400 text-yellow-500'
+                          : 'border-transparent text-zinc-500 hover:text-zinc-305'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile Single Container Slider */}
+              <div className="block lg:hidden">
+                {(() => {
+                  const cat = dashboardCategories.find(c => c.id === activeWorkoutCategory);
+                  if (!cat) return null;
+                  const allCategoryWorkouts = dashboardWorkouts.filter(w => w.category === cat.id);
+                  const activeIdx = activeIndices[cat.id] || 0;
+                  const virtualized = getVirtualizedWorkouts(cat.id);
+
+                  return (
+                    <div className="space-y-4 max-h-[520px] overflow-hidden py-12 gap-5 mb-6">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="font-display text-sm font-black italic uppercase text-yellow-400">
+                          {cat.label} Selected
+                        </h3>
+                      </div>
+
+                      <div className="relative w-full max-w-sm mx-auto">
+                        {/* Arrows & Header details */}
+                        <div className="flex items-center justify-between mb-3 text-xs">
+                          <span className="text-zinc-550 font-mono font-bold">
+                            Workout {activeIdx + 1} of {allCategoryWorkouts.length}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handlePrevCard(cat.id)}
+                              className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-850 text-zinc-305 hover:border-yellow-450 transition-colors"
+                            >
+                              ←
+                            </button>
+                            <button
+                              onClick={() => handleNextCard(cat.id)}
+                              className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-850 text-zinc-305 hover:border-yellow-450 transition-colors"
+                            >
+                              →
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Slide container with touch handlers for swipe gestures */}
+                        <div
+                          onTouchStart={onTouchStart}
+                          onTouchMove={onTouchMove}
+                          onTouchEnd={() => onTouchEnd(cat.id)}
+                          className="relative flex gap-4 overflow-visible min-h-[240px]"
+                        >
+                          {virtualized.map((w) => (
+                            <div
+                              key={w.id}
+                              className={`w-full shrink-0 transition-all duration-300 ${
+                                w.isActive ? 'opacity-100 scale-100' : 'opacity-0 pointer-events-none absolute scale-95'
+                              }`}
+                            >
+                              <div
+                                onClick={() => setSelectedWorkout(w)}
+                                className="rounded-xl border border-zinc-850 bg-zinc-900/40 p-4 shadow-xl flex flex-col justify-between min-h-[230px] cursor-pointer hover:border-yellow-400/40 transition-all"
+                              >
+                                <div className="space-y-3">
+                                  <div className="relative h-24 w-full overflow-hidden rounded-lg border border-zinc-850">
+                                    <img
+                                      src={w.image}
+                                      alt={w.name}
+                                      className="w-full h-full object-cover grayscale opacity-85"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                                      <span className="rounded bg-yellow-455 text-black px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">
+                                        {w.difficulty}
+                                      </span>
+                                      <span className="text-white font-mono text-[9px] font-bold">
+                                        {w.duration}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-display text-sm font-black italic text-white uppercase leading-tight">
+                                      {w.name}
+                                    </h4>
+                                    <p className="text-zinc-400 text-[10px] leading-relaxed line-clamp-2 mt-1">
+                                      {w.description}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-zinc-850/50 flex justify-between items-center text-[9px] font-mono text-zinc-550 font-semibold">
+                                  <span>Est: <strong className="text-yellow-400">{w.calories}</strong></span>
+                                  <span className="text-yellow-400 font-bold">Tap Details →</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Dots */}
+                        <div className="flex justify-center gap-1.5 mt-3">
+                          {allCategoryWorkouts.map((_, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setActiveIndices(prev => ({ ...prev, [cat.id]: idx }))}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                idx === activeIdx ? 'w-4 bg-yellow-400' : 'w-1.5 bg-zinc-800'
+                              }`}
+                              aria-label={`Slide ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+
+                        {/* View More button at the bottom of carousel on mobile */}
+                        <div className="text-center mt-3">
+                          <button
+                            onClick={() => setSelectedCategoryMore(cat.id)}
+                            className="text-[10px] font-mono font-bold text-yellow-500 hover:text-yellow-400 uppercase tracking-wider"
+                          >
+                            [ View All {cat.id} ]
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Desktop layout: remains unchanged showing all categories vertically in a grid */}
+              <div className="hidden lg:block space-y-10">
+                {dashboardCategories.map((cat) => {
+                  const allCategoryWorkouts = dashboardWorkouts.filter(w => w.category === cat.id);
+                  return (
+                    <div key={cat.id} className="space-y-4 border-b border-zinc-900 pb-8 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-display text-lg font-black italic uppercase text-yellow-400">
+                          {cat.label}
+                        </h3>
+                        <button
+                          onClick={() => setSelectedCategoryMore(cat.id)}
+                          className="flex items-center gap-1 text-[11px] font-mono font-bold text-yellow-500 hover:text-yellow-450 hover:underline uppercase"
+                        >
+                          View All ({allCategoryWorkouts.length}) →
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-6">
+                        {allCategoryWorkouts.map((w) => (
+                          <div
+                            key={w.id}
+                            onClick={() => setSelectedWorkout(w)}
+                            className="rounded-xl border border-zinc-850 bg-zinc-900/20 p-5 shadow-lg flex flex-col justify-between min-h-[300px] cursor-pointer hover:border-yellow-400/40 hover:shadow-[0_0_20px_rgba(250,204,21,0.05)] hover:-translate-y-1 transition-all duration-300 group"
+                          >
+                            <div className="space-y-4">
+                              <div className="relative h-36 w-full overflow-hidden rounded-lg border border-zinc-800/80">
+                                <img
+                                  src={w.image}
+                                  alt={w.name}
+                                  className="w-full h-full object-cover grayscale opacity-75 group-hover:scale-105 group-hover:opacity-90 transition-all duration-505"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
+                                <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
+                                  <span className="rounded bg-yellow-400 text-black px-2 py-0.5 text-[9px] font-black uppercase tracking-wider">
+                                    {w.difficulty}
+                                  </span>
+                                  <span className="text-white font-mono text-[10px] font-bold">
+                                    {w.duration}
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <h4 className="font-display text-base font-black italic text-white uppercase group-hover:text-yellow-400 transition-colors leading-tight">
+                                  {w.name}
+                                </h4>
+                                <p className="text-zinc-400 text-[11px] leading-relaxed line-clamp-2 mt-1">
+                                  {w.description}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-zinc-850/50 flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                              <span>Burn: <strong className="text-yellow-400">{w.calories}</strong></span>
+                              <span className="text-yellow-400 font-bold group-hover:underline">Start Routine →</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
       </div>
+      {/* Workout Detail Modal */}
+      <AnimatePresence>
+        {selectedWorkout && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedWorkout(null)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative z-10 w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-2xl p-6 text-white shadow-2xl overflow-hidden"
+            >
+              <button
+                onClick={() => setSelectedWorkout(null)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="space-y-6">
+                <div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    <span className="rounded bg-yellow-450/10 border border-yellow-400/20 text-yellow-405 px-2.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-widest">
+                      {selectedWorkout.difficulty}
+                    </span>
+                    <span className="rounded bg-zinc-900 border border-zinc-800 text-zinc-300 px-2.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-widest">
+                      ⏱️ {selectedWorkout.duration}
+                    </span>
+                    <span className="rounded bg-zinc-900 border border-zinc-800 text-zinc-300 px-2.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-widest">
+                      🔥 {selectedWorkout.calories}
+                    </span>
+                  </div>
+                  
+                  <h3 className="font-display text-2xl font-black italic uppercase text-white leading-tight">
+                    {selectedWorkout.name}
+                  </h3>
+                  <p className="text-zinc-400 text-xs mt-1">{selectedWorkout.category}</p>
+                </div>
+
+                <p className="text-zinc-300 text-xs leading-relaxed border-l-2 border-yellow-400 pl-3">
+                  {selectedWorkout.description}
+                </p>
+
+                <div className="space-y-3">
+                  <h4 className="font-mono text-[10px] uppercase font-bold tracking-wider text-yellow-400">Exercises & Routine Breakdown:</h4>
+                  <ul className="space-y-2">
+                    {selectedWorkout.exercises.map((ex: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300 bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-900">
+                        <span className="h-5 w-5 rounded-full bg-yellow-400/10 border border-yellow-450/20 text-yellow-400 flex items-center justify-center font-mono text-[9px] font-bold flex-shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-normal">{ex}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setSelectedWorkout(null);
+                      setActiveTab('coach');
+                    }}
+                    className="flex-1 rounded-lg bg-yellow-400 text-black py-3 text-xs font-black italic uppercase tracking-wider hover:bg-yellow-300 transition-all text-center font-bold"
+                  >
+                    Start with Zeus Coach AI
+                  </button>
+                  <button
+                    onClick={() => setSelectedWorkout(null)}
+                    className="rounded-lg border border-zinc-800 bg-zinc-900 px-5 py-3 text-xs font-bold uppercase hover:bg-zinc-800 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Category View All Modal */}
+      <AnimatePresence>
+        {selectedCategoryMore && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedCategoryMore(null)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative z-10 w-full max-w-4xl bg-zinc-950 border border-zinc-900 rounded-2xl p-6 text-white shadow-2xl overflow-y-auto max-h-[85vh]"
+            >
+              <button
+                onClick={() => setSelectedCategoryMore(null)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-display text-xl font-black italic uppercase text-yellow-450">
+                    {selectedCategoryMore} Library
+                  </h3>
+                  <p className="text-[10px] text-zinc-550 font-mono mt-0.5">
+                    Browse all compiled exercises and training models.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                  {dashboardWorkouts
+                    .filter(w => w.category === selectedCategoryMore)
+                    .map((w) => (
+                      <div
+                        key={w.id}
+                        onClick={() => {
+                          setSelectedCategoryMore(null);
+                          setSelectedWorkout(w);
+                        }}
+                        className="rounded-xl border border-zinc-850 bg-zinc-900/30 p-4 flex flex-col justify-between min-h-[240px] cursor-pointer hover:border-yellow-400/40 hover:-translate-y-1 transition-all duration-300"
+                      >
+                        <div className="space-y-3">
+                          <div className="relative h-28 w-full overflow-hidden rounded-lg border border-zinc-850">
+                            <img
+                              src={w.image}
+                              alt={w.name}
+                              className="w-full h-full object-cover grayscale opacity-80"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                              <span className="rounded bg-yellow-400 text-black px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">
+                                {w.difficulty}
+                              </span>
+                              <span className="text-white font-mono text-[9px] font-bold">
+                                {w.duration}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-display text-sm font-black italic text-white uppercase leading-tight">
+                              {w.name}
+                            </h4>
+                            <p className="text-zinc-500 text-[10px] leading-relaxed line-clamp-2 mt-1">
+                              {w.description}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-zinc-850/50 flex justify-between items-center text-[9px] font-mono text-zinc-650">
+                          <span>Est: <strong className="text-yellow-400">{w.calories}</strong></span>
+                          <span className="text-yellow-400 font-bold">Start Routine →</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 };
