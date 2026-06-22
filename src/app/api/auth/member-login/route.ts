@@ -30,12 +30,11 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      console.log(`[MEMBER-LOGIN-AUDIT] Identifier detected as phone.`);
-      const { validatePhone } = require('@/lib/validation');
-      if (!validatePhone(identifier)) {
+      const isValidPhone = /^\+?\d{8,15}$/.test(identifier);
+      if (!isValidPhone) {
         console.log(`[MEMBER-LOGIN-AUDIT] Phone formatting check failed: ${identifier}`);
         return NextResponse.json(
-          { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
+          { success: false, error: 'Phone number must be between 8 and 15 digits.' },
           { status: 400 }
         );
       }
@@ -43,11 +42,11 @@ export async function POST(request: Request) {
 
     // Retrieve member
     console.log(`[MEMBER-LOGIN-AUDIT] Running db lookup for: ${identifier}`);
-    const member = isEmail
-      ? await db.getMemberByEmail(identifier)
-      : await db.getMemberByPhone(identifier);
+    const members = isEmail
+      ? await db.getMembersByEmail(identifier)
+      : await db.getMembersByPhone(identifier);
 
-    if (!member) {
+    if (!members || members.length === 0) {
       console.log(`[MEMBER-LOGIN-AUDIT] Member lookup failed: No record found for ${identifier}`);
       return NextResponse.json(
         { success: false, error: 'Invalid identifier or password.' },
@@ -55,28 +54,38 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`[MEMBER-LOGIN-AUDIT] Member found. Member ID: ${member.member_id}, Name: ${member.name}, Status: ${member.status}, Force Reset: ${member.force_reset}, Password Hash length: ${member.password_hash ? member.password_hash.length : 0}`);
+    console.log(`[MEMBER-LOGIN-AUDIT] Members found: ${members.length}. Scanning for password match.`);
 
-    // Check if account has been activated (has password_hash)
-    if (!member.password_hash) {
-      console.log(`[MEMBER-LOGIN-AUDIT] Member does not have password hash. Activation required.`);
-      return NextResponse.json(
-        { success: false, error: 'Account not activated yet. Please activate your account first.' },
-        { status: 403 }
-      );
+    let matchedMember = null;
+    for (const member of members) {
+      console.log(`[MEMBER-LOGIN-AUDIT] Checking member: ${member.member_id}, Status: ${member.status}, Force Reset: ${member.force_reset}, Password Hash length: ${member.password_hash ? member.password_hash.length : 0}`);
+      
+      // Check if account has been activated (has password_hash)
+      if (!member.password_hash) {
+        console.log(`[MEMBER-LOGIN-AUDIT] Member ${member.member_id} does not have password hash. Skipping.`);
+        continue;
+      }
+
+      // Verify Password
+      console.log(`[MEMBER-LOGIN-AUDIT] Comparing password against hash via bcrypt for member ${member.member_id}.`);
+      const passwordMatch = await bcrypt.compare(password, member.password_hash);
+      console.log(`[MEMBER-LOGIN-AUDIT] Bcrypt match result for member ${member.member_id}: ${passwordMatch}`);
+      
+      if (passwordMatch) {
+        matchedMember = member;
+        break;
+      }
     }
 
-    // Verify Password
-    console.log(`[MEMBER-LOGIN-AUDIT] Comparing password against hash via bcrypt.`);
-    const passwordMatch = await bcrypt.compare(password, member.password_hash);
-    console.log(`[MEMBER-LOGIN-AUDIT] Bcrypt match result: ${passwordMatch}`);
-    if (!passwordMatch) {
-      console.log(`[MEMBER-LOGIN-AUDIT] Bcrypt mismatch for member: ${member.member_id}`);
+    if (!matchedMember) {
+      console.log(`[MEMBER-LOGIN-AUDIT] No matching member password hash found in the list.`);
       return NextResponse.json(
         { success: false, error: 'Invalid identifier or password.' },
         { status: 401 }
       );
     }
+
+    const member = matchedMember;
 
     // Check if suspended
     if (member.status === 'Suspended') {

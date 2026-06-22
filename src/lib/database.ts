@@ -2211,24 +2211,37 @@ async getMemberById(id: string | number): Promise<Member | null> {
   return current.find(m => String(m.id) === String(id) || m.member_id === String(id)) || null;
 },
 
-async getMemberByPhone(phone: string): Promise<Member | null> {
-  if (typeof window !== 'undefined') {
-    const res = await clientProxy<Member | null>('getMemberByPhone', [phone]);
-    if (res !== null) return res;
+  async getMemberByPhone(phone: string): Promise<Member | null> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<Member | null>('getMemberByPhone', [phone]);
+      if (res !== null) return res;
+      const current = getLocal<Member[]>('members', []);
+      return current.find(m => m.phone === phone) || null;
+    }
+
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM members WHERE phone = ${phone}`;
+      return rows.length > 0 ? (rows[0] as unknown as Member) : null;
+    }
+
     const current = getLocal<Member[]>('members', []);
     return current.find(m => m.phone === phone) || null;
-  }
+  },
 
-  if (databaseUrl) {
-    await ensureDbInitialized();
-    const sql = neon(databaseUrl);
-    const rows = await sql`SELECT * FROM members WHERE phone = ${phone}`;
-    return rows.length > 0 ? (rows[0] as unknown as Member) : null;
-  }
-
-  const current = getLocal<Member[]>('members', []);
-  return current.find(m => m.phone === phone) || null;
-},
+  async getMembersByPhone(phone: string): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any[]>('getMembersByPhone', [phone]) || [];
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM members WHERE phone = ${phone}`;
+      return rows;
+    }
+    return [];
+  },
 
 async saveMember(member: Partial<Member>): Promise<Member> {
   let member_id = member.member_id;
@@ -3875,6 +3888,19 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       return rows[0] || null;
     }
     return null;
+  },
+
+  async getMembersByEmail(email: string): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any[]>('getMembersByEmail', [email]) || [];
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM members WHERE email = ${email}`;
+      return rows;
+    }
+    return [];
   },
 
   async createMemberWithOtp(data: { name: string; email: string; phone: string; password_hash?: string }): Promise<any> {
