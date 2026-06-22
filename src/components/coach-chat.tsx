@@ -57,6 +57,16 @@ export const CoachChat: React.FC<CoachChatProps> = ({ onOpenBooking }) => {
     const text = (textToSend || inputText).trim();
     if (!text) return;
 
+    if (text.length > 2000) {
+      alert('Message is too long. Limit is 2000 characters.');
+      return;
+    }
+
+    if (/[<>]/g.test(text)) {
+      alert('Invalid characters in message.');
+      return;
+    }
+
     if (!textToSend) setInputText('');
 
     const userMessage: Message = {

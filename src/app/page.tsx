@@ -359,9 +359,27 @@ export default function Home() {
   };
 
   // Handle Career hiring submission
+  const [careerError, setCareerError] = useState('');
+
   const handleCareerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!careerForm.name || !careerForm.phone || !careerForm.experience) return;
+    setCareerError('');
+    if (!careerForm.name || !careerForm.phone || !careerForm.experience) {
+      setCareerError('All fields are required.');
+      return;
+    }
+
+    const { validatePhone, validateName } = require('@/lib/validation');
+    if (!validateName(careerForm.name)) {
+      setCareerError('Name must be between 2 and 100 characters and contain no special characters/tags.');
+      return;
+    }
+
+    if (!validatePhone(careerForm.phone)) {
+      setCareerError('Phone number must be exactly 10 digits starting with 6-9.');
+      return;
+    }
+
     setCareerSubmitting(true);
 
     try {
@@ -371,13 +389,18 @@ export default function Home() {
         body: JSON.stringify(careerForm),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         setCareerSuccess(true);
         setCareerForm({ name: '', phone: '', role: 'Trainer', experience: '' });
         setTimeout(() => setCareerSuccess(false), 5000);
+      } else {
+        setCareerError(data.error || 'Failed to submit application.');
       }
     } catch (err) {
       console.error('Career submit failure:', err);
+      setCareerError('Network error. Please try again.');
     } finally {
       setCareerSubmitting(false);
     }
@@ -1518,6 +1541,12 @@ export default function Home() {
                         />
                       </div>
                     </div>
+
+                    {careerError && (
+                      <p className="text-xs text-red-500 font-mono bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg px-3 py-2">
+                        ⚠️ {careerError}
+                      </p>
+                    )}
 
                     <button
                       type="submit"

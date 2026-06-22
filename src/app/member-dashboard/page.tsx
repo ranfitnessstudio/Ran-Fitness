@@ -11,12 +11,19 @@ export default async function MemberDashboardPage() {
     redirect('/');
   }
 
-  const memberId = session.value;
+  const parts = session.value.split('.');
+  const memberId = parts[0];
   
   // Fetch member from database
   const member = await db.getMemberById(memberId);
   if (!member) {
     // Session exists but member deleted/invalid, logout to clean session
+    redirect('/api/auth/logout');
+  }
+
+  const { verifyMemberSessionCookie } = require('@/lib/auth-token');
+  const isSessionValid = await verifyMemberSessionCookie(session.value, member.password_hash);
+  if (!isSessionValid) {
     redirect('/api/auth/logout');
   }
 

@@ -137,6 +137,7 @@ export interface Member {
   notes?: string;
   created_at?: string;
   telegram_chat_id?: string;
+  force_reset?: boolean;
 }
 
 export interface MemberProgress {
@@ -748,6 +749,18 @@ async function ensureDbInitialized() {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS member_memory (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(member_id, key)
+      )
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS progress_photos (
         id SERIAL PRIMARY KEY,
         member_id TEXT NOT NULL,
@@ -756,6 +769,16 @@ async function ensureDbInitialized() {
         back_photo TEXT,
         month_label TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS workout_session_state (
+        member_id TEXT PRIMARY KEY,
+        current_phase INT NOT NULL DEFAULT 0,
+        completed_phases TEXT[] NOT NULL DEFAULT '{}',
+        last_workout_day TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `;
 
@@ -834,11 +857,14 @@ async function ensureDbInitialized() {
         id SERIAL PRIMARY KEY,
         member_id TEXT NOT NULL,
         question TEXT NOT NULL,
+        reply TEXT NOT NULL DEFAULT '',
         provider TEXT NOT NULL,
         response_time_ms INT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `;
+
+    await sql`ALTER TABLE member_ai_chats ADD COLUMN IF NOT EXISTS reply TEXT NOT NULL DEFAULT ''`;
 
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT`;
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS plan_id TEXT`;
@@ -879,6 +905,35 @@ async function ensureDbInitialized() {
     await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS virtual_tour_opens INT DEFAULT 0`;
     await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS trainer_card_clicks INT DEFAULT 0`;
     await sql`ALTER TABLE visitor_analytics ADD COLUMN IF NOT EXISTS equipment_views INT DEFAULT 0`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        otp_hash TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        attempts INT DEFAULT 0,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_pwd_reset_member_id ON password_reset_tokens(member_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_pwd_reset_phone ON password_reset_tokens(phone)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_pwd_reset_expires_at ON password_reset_tokens(expires_at)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS password_reset_audit (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        admin_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        timestamp TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS force_reset BOOLEAN DEFAULT FALSE`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS admin_credentials (
@@ -2306,14 +2361,15 @@ async deleteMember(id: string | number): Promise<boolean> {
   return true;
 },
 
-async updateMemberPassword(memberId: string, passwordHash: string): Promise<boolean> {
+async updateMemberPassword(memberId: string, passwordHash: string, forceReset = false): Promise<boolean> {
   if (typeof window !== 'undefined') {
-    const res = await clientProxy<boolean>('updateMemberPassword', [memberId, passwordHash]);
+    const res = await clientProxy<boolean>('updateMemberPassword', [memberId, passwordHash, forceReset]);
     if (res !== null) return res;
     const current = getLocal<Member[]>('members', []);
     const idx = current.findIndex(m => m.member_id === memberId || String(m.id) === String(memberId));
     if (idx !== -1) {
       current[idx].password_hash = passwordHash;
+      current[idx].force_reset = forceReset;
       setLocal('members', current);
       return true;
     }
@@ -2323,7 +2379,7 @@ async updateMemberPassword(memberId: string, passwordHash: string): Promise<bool
   if (databaseUrl) {
     await ensureDbInitialized();
     const sql = neon(databaseUrl);
-    await sql`UPDATE members SET password_hash = ${passwordHash} WHERE member_id = ${memberId} OR id = ${parseInt(memberId) || 0}`;
+    await sql`UPDATE members SET password_hash = ${passwordHash}, force_reset = ${forceReset} WHERE member_id = ${memberId} OR id = ${parseInt(memberId) || 0}`;
     return true;
   }
 
@@ -2331,6 +2387,7 @@ async updateMemberPassword(memberId: string, passwordHash: string): Promise<bool
   const idx = current.findIndex(m => m.member_id === memberId || String(m.id) === String(memberId));
   if (idx !== -1) {
     current[idx].password_hash = passwordHash;
+    current[idx].force_reset = forceReset;
     setLocal('members', current);
     return true;
   }
@@ -2524,6 +2581,11 @@ async checkInMember(memberId: string): Promise<boolean> {
     const res = await clientProxy<boolean>('checkInMember', [memberId]);
     if (res !== null) return res;
     const current = getLocal<Attendance[]>('member_attendance', []);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const existsToday = current.some(a => a.member_id === memberId && a.check_in_time.startsWith(todayStr));
+    if (existsToday) {
+      throw new Error('Already checked in today.');
+    }
     current.unshift({ member_id: memberId, check_in_time: new Date().toISOString() });
     setLocal('member_attendance', current);
     return true;
@@ -2532,11 +2594,29 @@ async checkInMember(memberId: string): Promise<boolean> {
   if (databaseUrl) {
     await ensureDbInitialized();
     const sql = neon(databaseUrl);
+    
+    // Check if checkin already exists for today (in IST / local date)
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
+    const alreadyChecked = await sql`
+      SELECT 1 FROM member_attendance 
+      WHERE member_id = ${memberId} 
+      AND (check_in_time AT TIME ZONE 'Asia/Kolkata')::date = ${todayStr}::date
+      LIMIT 1
+    `;
+    if (alreadyChecked.length > 0) {
+      throw new Error('Already checked in today.');
+    }
+
     await sql`INSERT INTO member_attendance (member_id, check_in_time) VALUES (${memberId}, NOW())`;
     return true;
   }
 
   const current = getLocal<Attendance[]>('member_attendance', []);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const existsToday = current.some(a => a.member_id === memberId && a.check_in_time.startsWith(todayStr));
+  if (existsToday) {
+    throw new Error('Already checked in today.');
+  }
   current.unshift({ member_id: memberId, check_in_time: new Date().toISOString() });
   setLocal('member_attendance', current);
   return true;
@@ -2905,14 +2985,37 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       const res = await clientProxy<any>('saveProgressPhotos', [photo]);
       if (res !== null) return res;
       const current = getLocal<any[]>(`progress_photos_${photo.member_id}`, []);
+      const index = current.findIndex(p => p.month_label === photo.month_label);
       const newPhoto = { id: current.length + 1, ...photo, created_at: new Date().toISOString() };
-      current.unshift(newPhoto);
+      if (index !== -1) {
+        current[index] = newPhoto;
+      } else {
+        current.unshift(newPhoto);
+      }
       setLocal(`progress_photos_${photo.member_id}`, current);
       return newPhoto;
     }
     if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
+      
+      // Enforce 1 progress record per calendar month (UPSERT)
+      const existing = await sql`
+        SELECT id FROM progress_photos 
+        WHERE member_id = ${photo.member_id} AND month_label = ${photo.month_label}
+        LIMIT 1
+      `;
+
+      if (existing.length > 0) {
+        const updated = await sql`
+          UPDATE progress_photos 
+          SET front_photo = ${photo.front_photo}, side_photo = ${photo.side_photo}, back_photo = ${photo.back_photo}, created_at = NOW()
+          WHERE id = ${existing[0].id}
+          RETURNING *
+        `;
+        return updated[0];
+      }
+
       const rows = await sql`
         INSERT INTO progress_photos (member_id, front_photo, side_photo, back_photo, month_label)
         VALUES (${photo.member_id}, ${photo.front_photo}, ${photo.side_photo}, ${photo.back_photo}, ${photo.month_label})
@@ -2921,8 +3024,13 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       return rows[0];
     }
     const current = getLocal<any[]>(`progress_photos_${photo.member_id}`, []);
+    const index = current.findIndex(p => p.month_label === photo.month_label);
     const newPhoto = { id: current.length + 1, ...photo, created_at: new Date().toISOString() };
-    current.unshift(newPhoto);
+    if (index !== -1) {
+      current[index] = newPhoto;
+    } else {
+      current.unshift(newPhoto);
+    }
     setLocal(`progress_photos_${photo.member_id}`, current);
     return newPhoto;
   },
@@ -3155,7 +3263,7 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     return fallback;
   },
 
-  async saveMemberAiChat(chat: { member_id: string; question: string; provider: string; response_time_ms: number }): Promise<any> {
+  async saveMemberAiChat(chat: { member_id: string; question: string; reply: string; provider: string; response_time_ms: number }): Promise<any> {
     if (typeof window !== 'undefined') {
       const res = await clientProxy<any>('saveMemberAiChat', [chat]);
       return res;
@@ -3164,8 +3272,8 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
       const rows = await sql`
-        INSERT INTO member_ai_chats (member_id, question, provider, response_time_ms)
-        VALUES (${chat.member_id}, ${chat.question}, ${chat.provider}, ${chat.response_time_ms})
+        INSERT INTO member_ai_chats (member_id, question, reply, provider, response_time_ms)
+        VALUES (${chat.member_id}, ${chat.question}, ${chat.reply}, ${chat.provider}, ${chat.response_time_ms})
         RETURNING *
       `;
       return rows[0];
@@ -3376,5 +3484,223 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     } else {
       return true;
     }
+  },
+
+  async getMemberMemory(memberId: string): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any[]>('getMemberMemory', [memberId]);
+      if (res !== null) return res;
+      return getLocal(`member_memory_${memberId}`, []);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      return await sql`SELECT * FROM member_memory WHERE member_id = ${memberId} ORDER BY updated_at DESC`;
+    }
+    return getLocal(`member_memory_${memberId}`, []);
+  },
+
+  async saveMemberMemory(data: { member_id: string; key: string; value: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('saveMemberMemory', [data]);
+      if (res !== null) return res;
+      const current = getLocal<any[]>(`member_memory_${data.member_id}`, []);
+      const index = current.findIndex(m => m.key === data.key);
+      const newMemory = { ...data, updated_at: new Date().toISOString() };
+      if (index !== -1) {
+        current[index] = newMemory;
+      } else {
+        current.unshift(newMemory);
+      }
+      setLocal(`member_memory_${data.member_id}`, current);
+      return newMemory;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        INSERT INTO member_memory (member_id, key, value, updated_at)
+        VALUES (${data.member_id}, ${data.key}, ${data.value}, NOW())
+        ON CONFLICT (member_id, key) 
+        DO UPDATE SET value = ${data.value}, updated_at = NOW()
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async getWorkoutSessionState(memberId: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('getWorkoutSessionState', [memberId]);
+      if (res !== null) return res;
+      return getLocal(`workout_session_state_${memberId}`, null);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM workout_session_state WHERE member_id = ${memberId} LIMIT 1`;
+      return rows[0] || null;
+    }
+    return getLocal(`workout_session_state_${memberId}`, null);
+  },
+
+  async saveWorkoutSessionState(state: { member_id: string; current_phase: number; completed_phases: string[]; last_workout_day: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<any>('saveWorkoutSessionState', [state]);
+      if (res !== null) return res;
+      setLocal(`workout_session_state_${state.member_id}`, state);
+      return state;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        INSERT INTO workout_session_state (member_id, current_phase, completed_phases, last_workout_day, updated_at)
+        VALUES (${state.member_id}, ${state.current_phase}, ${state.completed_phases}, ${state.last_workout_day}, NOW())
+        ON CONFLICT (member_id) 
+        DO UPDATE SET current_phase = ${state.current_phase}, completed_phases = ${state.completed_phases}, last_workout_day = ${state.last_workout_day}, updated_at = NOW()
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async deleteProgressPhoto(id: number, memberId?: string): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      const res = await clientProxy<boolean>('deleteProgressPhoto', [id, memberId]);
+      return res || false;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      if (memberId) {
+        await sql`DELETE FROM progress_photos WHERE id = ${id} AND member_id = ${memberId}`;
+      } else {
+        await sql`DELETE FROM progress_photos WHERE id = ${id}`;
+      }
+      return true;
+    }
+    return false;
+  },
+
+  async createPasswordResetToken(data: { member_id: string; phone: string; otp_hash: string; expires_at: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('createPasswordResetToken', [data]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      // Invalidate existing active tokens
+      await sql`UPDATE password_reset_tokens SET used = TRUE WHERE phone = ${data.phone}`;
+      const rows = await sql`
+        INSERT INTO password_reset_tokens (member_id, phone, otp_hash, expires_at)
+        VALUES (${data.member_id}, ${data.phone}, ${data.otp_hash}, ${data.expires_at})
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async getPasswordResetToken(phone: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('getPasswordResetToken', [phone]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        SELECT * FROM password_reset_tokens 
+        WHERE phone = ${phone} AND used = FALSE AND expires_at > NOW() 
+        ORDER BY created_at DESC LIMIT 1
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async incrementResetTokenAttempts(id: number): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('incrementResetTokenAttempts', [id]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE password_reset_tokens 
+        SET attempts = attempts + 1 
+        WHERE id = ${id} 
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async markResetTokenUsed(id: number): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('markResetTokenUsed', [id]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE password_reset_tokens 
+        SET used = TRUE 
+        WHERE id = ${id} 
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async deleteExpiredResetTokens(): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<boolean>('deleteExpiredResetTokens') || false;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      await sql`DELETE FROM password_reset_tokens WHERE expires_at <= NOW()`;
+      return true;
+    }
+    return false;
+  },
+
+  async savePasswordResetAudit(data: { member_id: string; admin_id: string; action: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('savePasswordResetAudit', [data]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        INSERT INTO password_reset_audit (member_id, admin_id, action)
+        VALUES (${data.member_id}, ${data.admin_id}, ${data.action})
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async getPasswordResetAudits(memberId: string): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any[]>('getPasswordResetAudits', [memberId]) || [];
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        SELECT * FROM password_reset_audit 
+        WHERE member_id = ${memberId} 
+        ORDER BY timestamp DESC
+      `;
+      return rows;
+    }
+    return [];
   }
 };

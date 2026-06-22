@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Flame, ChevronRight, Activity } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { validatePhone, validateName } from '@/lib/validation';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -27,10 +28,26 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [shakeTrigger, setShakeTrigger] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) return;
+    setErrorMsg('');
+    
+    if (!formData.name || !formData.phone) {
+      setErrorMsg('Name and phone number are required.');
+      return;
+    }
+
+    if (!validateName(formData.name)) {
+      setErrorMsg('Name must be between 2 and 100 characters and contain no special characters or script tags.');
+      return;
+    }
+
+    if (!validatePhone(formData.phone)) {
+      setErrorMsg('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9.');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -43,6 +60,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           source,
         }),
       });
+
+      const data = await response.json();
 
       if (response.ok) {
         // Trigger "Weight Slam" effect: a rapid modal shake
@@ -58,9 +77,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         });
 
         setIsSuccess(true);
+      } else {
+        setErrorMsg(data.error || 'Failed to submit booking. Please try again.');
       }
     } catch (error) {
       console.error('Failed to submit booking:', error);
+      setErrorMsg('Network error. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -202,6 +224,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {errorMsg && (
+                  <p className="text-xs text-red-500 font-mono bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg px-3 py-2">
+                    ⚠️ {errorMsg}
+                  </p>
+                )}
 
                 {/* Submit Button */}
                 <button

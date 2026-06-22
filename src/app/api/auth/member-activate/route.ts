@@ -14,6 +14,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const { validatePhone, validatePassword } = require('@/lib/validation');
+    if (!validatePhone(phone)) {
+      return NextResponse.json(
+        { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
+        { status: 400 }
+      );
+    }
+
+    if (!validatePassword(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 8 characters long and contain uppercase, lowercase, numbers, and special characters.' },
+        { status: 400 }
+      );
+    }
+
     // Retrieve member
     const member = await db.getMemberByPhone(phone);
     if (!member) {

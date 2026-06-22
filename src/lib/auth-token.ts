@@ -62,3 +62,22 @@ export async function verifyToken(token: string): Promise<string | null> {
     return null;
   }
 }
+
+export async function hashSha256(input: string): Promise<string> {
+  const msgUint8 = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function generateMemberSessionCookieValue(memberId: string, passwordHash: string): Promise<string> {
+  const sig = await hashSha256(passwordHash);
+  return `${memberId}.${sig}`;
+}
+
+export async function verifyMemberSessionCookie(cookieValue: string, passwordHash: string): Promise<boolean> {
+  const parts = cookieValue.split('.');
+  if (parts.length !== 2) return false;
+  const sig = await hashSha256(passwordHash || '');
+  return parts[1] === sig;
+}

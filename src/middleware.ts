@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
   // Protect Member Dashboard
   if (pathname.startsWith('/member-dashboard')) {
     const memberSession = request.cookies.get('ran_member_session');
-    if (!memberSession) {
+    if (!memberSession || memberSession.value.split('.').length !== 2) {
       const url = request.nextUrl.clone();
       url.pathname = '/';
       return NextResponse.redirect(url);

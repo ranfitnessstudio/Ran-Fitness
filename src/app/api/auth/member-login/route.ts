@@ -14,6 +14,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const { validatePhone } = require('@/lib/validation');
+    if (!validatePhone(phone)) {
+      return NextResponse.json(
+        { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
+        { status: 400 }
+      );
+    }
+
     // Retrieve member
     const member = await db.getMemberByPhone(phone);
     if (!member) {
@@ -60,14 +68,18 @@ export async function POST(request: Request) {
         membership_type: member.membership_type,
         start_date: member.start_date,
         end_date: member.end_date,
-        status: member.status
+        status: member.status,
+        force_reset: member.force_reset
       }
     });
+
+    const { generateMemberSessionCookieValue } = require('@/lib/auth-token');
+    const signedCookieVal = await generateMemberSessionCookieValue(member.member_id, member.password_hash);
 
     // Set ran_member_session cookie with member_id
     response.headers.set(
       'Set-Cookie',
-      `ran_member_session=${member.member_id}; Path=/; Max-Age=7200; SameSite=Lax; HttpOnly`
+      `ran_member_session=${signedCookieVal}; Path=/; Max-Age=7200; SameSite=Lax; HttpOnly`
     );
 
     console.log(`[MEMBER LOGGED IN] Member ID: ${member.member_id}, Name: ${member.name}`);

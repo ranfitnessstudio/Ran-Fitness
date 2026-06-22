@@ -17,6 +17,23 @@ export async function POST(request: Request) {
       );
     }
 
+    const { validatePhone, validateName } = require('@/lib/validation');
+    if (!validateName(name)) {
+      console.log('[BOOKING] Validation failed: invalid name format or length');
+      return NextResponse.json(
+        { success: false, telegramDelivered: false, error: 'Name must be between 2 and 100 characters and contain no special characters or scripts.' },
+        { status: 400 }
+      );
+    }
+
+    if (!validatePhone(phone)) {
+      console.log('[BOOKING] Validation failed: invalid phone format');
+      return NextResponse.json(
+        { success: false, telegramDelivered: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
+        { status: 400 }
+      );
+    }
+
     console.log('[BOOKING] Form validation passed');
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;

@@ -26,7 +26,8 @@ import {
   Briefcase,
   AlertTriangle,
   MessageSquare,
-  Video
+  Video,
+  KeyRound
 } from 'lucide-react';
 import { db, Trainer, Equipment, MembershipPlan, Transformation, WebsiteSettings, Lead, SocialLinks, GymEvent, CareerApplication, AiMetric, AiProviderStatus, Member, MemberProgress, WorkoutDay, Announcement, Attendance, VirtualTour } from '@/lib/database';
 import { CloudinaryUpload } from '@/components/ui/cloudinary-upload';
@@ -159,6 +160,14 @@ export default function AdminDashboard() {
   const [progressMemberId, setProgressMemberId] = useState<string | null>(null);
   const [progressLogList, setProgressLogList] = useState<MemberProgress[]>([]);
 
+  // Password Recovery States
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
+  const [recoveryMember, setRecoveryMember] = useState<any>(null);
+  const [tempPassword, setTempPassword] = useState('');
+  const [forceResetNextLogin, setForceResetNextLogin] = useState(true);
+  const [recoveryAuditHistory, setRecoveryAuditHistory] = useState<any[]>([]);
+  const [generatingRecovery, setGeneratingRecovery] = useState(false);
+
   // Admin Security States
   const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'security'>('general');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -239,6 +248,67 @@ export default function AdminDashboard() {
     navigator.clipboard.writeText(id);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const handleOpenRecoveryModal = async (member: Member) => {
+    setRecoveryMember(member);
+    setTempPassword('');
+    setForceResetNextLogin(true);
+    setRecoveryAuditHistory([]);
+    setIsRecoveryModalOpen(true);
+    
+    // Fetch audit history
+    try {
+      const res = await db.getPasswordResetAudits(member.member_id);
+      setRecoveryAuditHistory(res || []);
+    } catch (e) {
+      console.error("Failed to load recovery audits:", e);
+    }
+  };
+
+  const handleGenerateTempPassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+    let generated = "";
+    generated += "R"; 
+    generated += "a"; 
+    generated += "n"; 
+    generated += "2"; 
+    generated += "@"; 
+    for (let i = 0; i < 5; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setTempPassword(generated);
+  };
+
+  const handleExecuteRecovery = async () => {
+    if (!tempPassword) {
+      showToastMessage("❌ Please generate or enter a temporary password.", "error");
+      return;
+    }
+
+    setGeneratingRecovery(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password/admin-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: recoveryMember.member_id,
+          tempPassword,
+          forceReset: forceResetNextLogin
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToastMessage("✅ Temporary password set and audit logged!");
+        setIsRecoveryModalOpen(false);
+      } else {
+        showToastMessage(`❌ Failed to reset password: ${data.error}`, "error");
+      }
+    } catch (err: any) {
+      showToastMessage(`❌ Network error: ${err.message}`, "error");
+    } finally {
+      setGeneratingRecovery(false);
+    }
   };
 
   // Auto calculate BMI in admin form
@@ -391,6 +461,30 @@ export default function AdminDashboard() {
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
+
+    const { validatePhone, validateName, validateEmail } = require('@/lib/validation');
+    if (!editingMember.name || !validateName(editingMember.name)) {
+      showToastMessage('Name must be between 2 and 100 characters and contain no special characters.', 'error');
+      return;
+    }
+
+    if (!editingMember.phone || !validatePhone(editingMember.phone)) {
+      showToastMessage('Phone number must be exactly 10 digits starting with 6-9.', 'error');
+      return;
+    }
+
+    if (editingMember.email && !validateEmail(editingMember.email)) {
+      showToastMessage('Invalid email address format.', 'error');
+      return;
+    }
+
+    if (editingMember.start_date && editingMember.end_date) {
+      if (new Date(editingMember.end_date) < new Date(editingMember.start_date)) {
+        showToastMessage('End date cannot be earlier than start date.', 'error');
+        return;
+      }
+    }
+
     try {
       const isNew = !editingMember.id;
       const res = await db.saveMember(editingMember);
@@ -898,7 +992,26 @@ ${xmlRows}
 
   const saveTrainerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingTrainer?.name || !editingTrainer?.designation) return;
+    if (!editingTrainer?.name || !editingTrainer?.designation) {
+      showToastMessage('Trainer name and designation are required.', 'error');
+      return;
+    }
+
+    const { validateName, validatePhone } = require('@/lib/validation');
+    if (!validateName(editingTrainer.name)) {
+      showToastMessage('Trainer name must be between 2 and 100 characters and contain no special characters.', 'error');
+      return;
+    }
+
+    if (editingTrainer.contact_number && !validatePhone(editingTrainer.contact_number)) {
+      showToastMessage('Trainer contact number must be exactly 10 digits starting with 6-9.', 'error');
+      return;
+    }
+
+    if (editingTrainer.image_url && !editingTrainer.image_url.startsWith('http://') && !editingTrainer.image_url.startsWith('https://')) {
+      showToastMessage('Trainer image URL must be a valid http or https URL.', 'error');
+      return;
+    }
     
     await db.saveTrainer({
       name: editingTrainer.name,
@@ -954,11 +1067,28 @@ ${xmlRows}
 
   const savePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingPlan?.name || !editingPlan?.price) return;
+    if (!editingPlan?.name || !editingPlan?.price) {
+      showToastMessage('Plan name and price are required.', 'error');
+      return;
+    }
+
+    const price = Number(editingPlan.price);
+    if (isNaN(price) || price <= 0) {
+      showToastMessage('Plan price must be a positive number greater than 0.', 'error');
+      return;
+    }
+
+    // Check duplicate name
+    const lowercaseName = editingPlan.name.trim().toLowerCase();
+    const duplicate = plans.find(p => p.name.trim().toLowerCase() === lowercaseName && p.id !== editingPlan.id);
+    if (duplicate) {
+      showToastMessage(`A plan named "${editingPlan.name}" already exists.`, 'error');
+      return;
+    }
 
     await db.savePlan({
       name: editingPlan.name,
-      price: Number(editingPlan.price),
+      price: price,
       duration: editingPlan.duration || 'Monthly',
       benefits: Array.isArray(editingPlan.benefits) 
         ? editingPlan.benefits 
@@ -982,12 +1112,32 @@ ${xmlRows}
 
   const saveTransformationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingTransformation?.member_name) return;
+    if (!editingTransformation?.member_name) {
+      showToastMessage('Member name is required.', 'error');
+      return;
+    }
+
+    if (!editingTransformation?.before_image || !editingTransformation?.after_image) {
+      showToastMessage('Both Before and After images are required for a transformation story.', 'error');
+      return;
+    }
+
+    const isValidUrl = (url: string) => url.startsWith('http://') || url.startsWith('https://');
+    if (!isValidUrl(editingTransformation.before_image) || !isValidUrl(editingTransformation.after_image)) {
+      showToastMessage('Before/After images must be valid URLs.', 'error');
+      return;
+    }
+
+    const { validateName } = require('@/lib/validation');
+    if (!validateName(editingTransformation.member_name)) {
+      showToastMessage('Member name must be between 2 and 100 characters and contain no special characters.', 'error');
+      return;
+    }
 
     await db.saveTransformation({
       member_name: editingTransformation.member_name,
-      before_image: editingTransformation.before_image || '',
-      after_image: editingTransformation.after_image || '',
+      before_image: editingTransformation.before_image,
+      after_image: editingTransformation.after_image,
       story: editingTransformation.story || '',
       weight_lost: editingTransformation.weight_lost || '',
       muscle_gained: editingTransformation.muscle_gained || '',
@@ -1921,6 +2071,13 @@ ${xmlRows}
                                 title="Log Body Metrics Progress"
                               >
                                 <TrendingUp size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenRecoveryModal(m)}
+                                className="text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                title="Reset Password / Account Recovery"
+                              >
+                                <KeyRound size={13} className="inline" />
                               </button>
                               <button
                                 onClick={() => {
@@ -4492,6 +4649,106 @@ ${xmlRows}
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* -----------------------------------------------------------------------
+          ADMIN PASSWORD RECOVERY & AUDIT LOGS MODAL
+          ----------------------------------------------------------------------- */}
+      {isRecoveryModalOpen && recoveryMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setIsRecoveryModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 text-zinc-900 dark:text-white space-y-4">
+            <h3 className="font-display font-black italic text-lg uppercase text-yellow-500 dark:text-yellow-400">
+              Recover / Reset Password: {recoveryMember.name}
+            </h3>
+
+            <div className="space-y-3 font-sans text-xs">
+              <div className="bg-zinc-50 dark:bg-zinc-900/40 p-4 border border-zinc-100 dark:border-zinc-900 rounded-lg space-y-3">
+                <div className="flex justify-between items-center text-[11px] font-mono">
+                  <span className="text-zinc-500 font-bold uppercase">Member ID</span>
+                  <span className="font-bold text-zinc-900 dark:text-white">{recoveryMember.member_id}</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px] font-mono">
+                  <span className="text-zinc-500 font-bold uppercase">Registered Phone</span>
+                  <span className="font-bold text-zinc-900 dark:text-white">{recoveryMember.phone}</span>
+                </div>
+              </div>
+
+              {/* Temporary Password Actions */}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Temporary Password</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tempPassword}
+                    onChange={(e) => setTempPassword(e.target.value)}
+                    className="flex-1 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-xs font-mono text-zinc-900 dark:text-white focus:outline-none"
+                    placeholder="Click Generate or enter custom temporary password"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateTempPassword}
+                    className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-yellow-400 dark:hover:border-yellow-400 rounded text-xs uppercase font-mono font-bold transition-all"
+                  >
+                    Generate
+                  </button>
+                </div>
+              </div>
+
+              {/* Force Password Change Next Login */}
+              <div className="flex items-center gap-2 py-2">
+                <input
+                  type="checkbox"
+                  id="forceResetCheckbox"
+                  checked={forceResetNextLogin}
+                  onChange={(e) => setForceResetNextLogin(e.target.checked)}
+                  className="rounded border-zinc-300 text-yellow-500 focus:ring-yellow-400 h-4 w-4"
+                />
+                <label htmlFor="forceResetCheckbox" className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 select-none cursor-pointer font-mono uppercase">
+                  Force password reset on next login
+                </label>
+              </div>
+
+              {/* Recovery Audit History */}
+              <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold font-mono">Recovery Action Logs</h4>
+                <div className="max-h-32 overflow-y-auto border border-zinc-150 dark:border-zinc-850 rounded-lg p-2 bg-zinc-50/50 dark:bg-zinc-900/20 space-y-2">
+                  {recoveryAuditHistory.length === 0 ? (
+                    <p className="text-[10px] text-zinc-400 italic text-center py-4 font-mono">No recovery audit history logged for this member.</p>
+                  ) : (
+                    recoveryAuditHistory.map((log: any) => (
+                      <div key={log.id} className="text-[9px] font-mono border-b border-zinc-100 dark:border-zinc-900/60 pb-1.5 last:border-b-0">
+                        <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
+                          <span>{log.action}</span>
+                          <span>{new Date(log.timestamp).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="text-zinc-400">Admin ID: {log.admin_id}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-zinc-100 dark:border-zinc-900 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setIsRecoveryModalOpen(false)}
+                className="px-4 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded uppercase tracking-widest font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteRecovery}
+                disabled={generatingRecovery}
+                className="px-4 py-2 bg-yellow-400 text-black rounded uppercase tracking-widest font-bold hover:bg-yellow-300 disabled:opacity-50 transition-all"
+              >
+                {generatingRecovery ? 'Saving...' : 'Apply Recovery Credentials'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

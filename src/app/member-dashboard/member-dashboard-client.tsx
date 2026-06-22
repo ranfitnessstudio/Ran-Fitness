@@ -147,6 +147,39 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Load last 50 chat messages from DB on load
+    const loadChatHistory = async () => {
+      try {
+        const history = await db.getMemberAiChats(member.member_id);
+        if (history && history.length > 0) {
+          const sortedHistory = [...history].reverse();
+          const loaded: any[] = [];
+          sortedHistory.forEach((c, idx) => {
+            loaded.push({
+              id: `hist_u_${c.id || idx}`,
+              sender: 'user',
+              text: c.question,
+              timestamp: new Date(c.created_at || Date.now())
+            });
+            if (c.reply) {
+              loaded.push({
+                id: `hist_c_${c.id || idx}`,
+                sender: 'coach',
+                text: c.reply,
+                timestamp: new Date(c.created_at || Date.now())
+              });
+            }
+          });
+          setChatMessages(prev => [...prev, ...loaded]);
+        }
+      } catch (err) {
+        console.error("Failed to load chat history:", err);
+      }
+    };
+    loadChatHistory();
+  }, [member.member_id]);
+
+  useEffect(() => {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatLoading]);
 
@@ -327,26 +360,76 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
       setPhotoError('Please select at least one photo to upload.');
       return;
     }
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+
+    const validateImageFile = (file: File | null) => {
+      if (!file) return true;
+      if (!allowedTypes.includes(file.type)) return false;
+      if (file.size > MAX_SIZE) return false;
+      return true;
+    };
+
+    if ((frontFile && !validateImageFile(frontFile)) || 
+        (sideFile && !validateImageFile(sideFile)) || 
+        (backFile && !validateImageFile(backFile))) {
+      setPhotoError('Invalid image file. Only JPG, JPEG, PNG, or WEBP under 10MB are allowed.');
+      return;
+    }
+
     setUploadingPhotos(true);
     try {
-      let frontB64 = '';
-      let sideB64 = '';
-      let backB64 = '';
+      const uploadToCloudinary = async (file: File, label: string) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', `member_progress/${member.member_id}`);
+        const res = await fetch('/api/cloudinary/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || `Failed to upload ${label} photo.`);
+        }
+        const data = await res.json();
+        return data.secure_url;
+      };
 
-      if (frontFile) frontB64 = await compressImage(frontFile);
-      if (sideFile) sideB64 = await compressImage(sideFile);
-      if (backFile) backB64 = await compressImage(backFile);
+      let frontUrl = '';
+      let sideUrl = '';
+      let backUrl = '';
+
+      if (frontFile) frontUrl = await uploadToCloudinary(frontFile, 'front');
+      if (sideFile) sideUrl = await uploadToCloudinary(sideFile, 'side');
+      if (backFile) backUrl = await uploadToCloudinary(backFile, 'back');
+
+      // Check if snapshot already exists for month to ask confirmation or replace
+      const monthExists = photosList.some(p => p.month_label === monthLabel);
+      if (monthExists && !confirm(`A progress entry for "${monthLabel}" already exists. Would you like to overwrite it?`)) {
+        setUploadingPhotos(false);
+        return;
+      }
 
       const saved = await db.saveProgressPhotos({
         member_id: member.member_id,
-        front_photo: frontB64,
-        side_photo: sideB64,
-        back_photo: backB64,
+        front_photo: frontUrl || (photosList.find(p => p.month_label === monthLabel)?.front_photo || ''),
+        side_photo: sideUrl || (photosList.find(p => p.month_label === monthLabel)?.side_photo || ''),
+        back_photo: backUrl || (photosList.find(p => p.month_label === monthLabel)?.back_photo || ''),
         month_label: monthLabel
       });
 
-      setPhotosList([saved, ...photosList]);
-      setPhotoSuccess('Photos uploaded and stored successfully!');
+      // Update local state list cleanly (overwriting month if existed)
+      const updatedList = [...photosList];
+      const monthIdx = updatedList.findIndex(p => p.month_label === monthLabel);
+      if (monthIdx !== -1) {
+        updatedList[monthIdx] = saved;
+      } else {
+        updatedList.unshift(saved);
+      }
+      setPhotosList(updatedList);
+
+      setPhotoSuccess('Photos uploaded to Cloudinary and snapshots stored successfully!');
       setFrontFile(null);
       setSideFile(null);
       setBackFile(null);
@@ -355,6 +438,71 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
     } finally {
       setUploadingPhotos(false);
     }
+  };
+
+  const getCloudinaryPublicId = (url: string) => {
+    if (!url || !url.includes('res.cloudinary.com')) return null;
+    try {
+      const parts = url.split('/image/upload/');
+      if (parts.length < 2) return null;
+      const pathParts = parts[1].split('/');
+      const publicIdWithExtension = pathParts.slice(1).join('/');
+      const dotIndex = publicIdWithExtension.lastIndexOf('.');
+      if (dotIndex !== -1) {
+        return publicIdWithExtension.substring(0, dotIndex);
+      }
+      return publicIdWithExtension;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const handleDeleteSnapshot = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this snapshot? This will remove it from Cloudinary and the database.')) return;
+    try {
+      const target = photosList.find(p => p.id === id);
+      if (target) {
+        const urls = [target.front_photo, target.side_photo, target.back_photo];
+        for (const url of urls) {
+          const publicId = getCloudinaryPublicId(url);
+          if (publicId) {
+            await fetch('/api/cloudinary/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ public_id: publicId })
+            }).catch(e => console.error("Cloudinary delete failed:", e));
+          }
+        }
+      }
+      
+      const success = await db.deleteProgressPhoto(id, member.member_id);
+      if (success) {
+        setPhotosList(prev => prev.filter(p => p.id !== id));
+        setPhotoSuccess('Snapshot deleted successfully.');
+        setTimeout(() => setPhotoSuccess(''), 5000);
+      } else {
+        setPhotoError('Failed to delete snapshot from database.');
+        setTimeout(() => setPhotoError(''), 5000);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setPhotoError('Error during deletion: ' + err.message);
+      setTimeout(() => setPhotoError(''), 5000);
+    }
+  };
+
+  const handleReplaceSnapshot = (p: any) => {
+    setMonthLabel(p.month_label);
+    alert(`Please select new files using the upload inputs above and click "Upload Entry" to replace your ${p.month_label} snapshot.`);
+    const formElement = document.getElementById('progress-photos-form');
+    formElement?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleUpdateSnapshot = (p: any) => {
+    setMonthLabel(p.month_label);
+    alert(`You can select new files to update individual views for ${p.month_label}. Unselected views will remain unchanged.`);
+    const formElement = document.getElementById('progress-photos-form');
+    formElement?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleLogProgress = async (e: React.FormEvent) => {
@@ -369,16 +517,28 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
       return;
     }
 
+    const wVal = parseFloat(weight);
+    const bfVal = parseFloat(bodyFat);
+    const cVal = parseFloat(chest);
+    const waVal = parseFloat(waist);
+    const aVal = parseFloat(arms);
+
+    if (isNaN(wVal) || wVal <= 0 || isNaN(bfVal) || bfVal <= 0 || isNaN(cVal) || cVal <= 0 || isNaN(waVal) || waVal <= 0 || isNaN(aVal) || aVal <= 0) {
+      setFormError('All measurements must be valid positive numbers greater than 0.');
+      setLoggingProgress(false);
+      return;
+    }
+
     try {
       const newProgress = await db.saveMemberProgress({
         member_id: member.member_id,
-        weight: parseFloat(weight),
-        body_fat: parseFloat(bodyFat),
-        chest: parseFloat(chest),
-        waist: parseFloat(waist),
-        arms: parseFloat(arms),
-        bmi: parseFloat(bmi),
-        notes
+        weight: wVal,
+        body_fat: bfVal,
+        chest: cVal,
+        waist: waVal,
+        arms: aVal,
+        bmi: parseFloat(bmi) || 22.0,
+        notes: notes || 'Member Entry'
       });
 
       if (newProgress) {
@@ -402,6 +562,15 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const handleSendChat = async (textToSend?: string) => {
     const text = (textToSend || chatInputText).trim();
     if (!text) return;
+    if (text.length > 2000) {
+      alert('Message is too long. Limit is 2000 characters.');
+      return;
+    }
+    // Simple XSS check
+    if (/[<>]/g.test(text)) {
+      alert('Invalid characters in message.');
+      return;
+    }
     if (!textToSend) setChatInputText('');
 
     const userMsg = {
@@ -1151,7 +1320,7 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                   {photoError && <div className="text-[10px] bg-red-950/40 border border-red-500/20 text-red-400 rounded p-2 font-mono">❌ {photoError}</div>}
                   {photoSuccess && <div className="text-[10px] bg-green-950/40 border border-green-500/20 text-green-400 rounded p-2 font-mono">✅ {photoSuccess}</div>}
 
-                  <form onSubmit={handleUploadPhotos} className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-mono text-[10px] bg-zinc-950 p-4 border border-zinc-850 rounded-xl">
+                  <form id="progress-photos-form" onSubmit={handleUploadPhotos} className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-mono text-[10px] bg-zinc-950 p-4 border border-zinc-850 rounded-xl">
                     <div className="space-y-1">
                       <label className="text-zinc-500 uppercase block font-bold">Front Photo</label>
                       <input 
@@ -1204,7 +1373,28 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                           <div key={idx} className="bg-zinc-950 border border-zinc-900 rounded-xl p-3.5 space-y-2.5">
                             <div className="flex justify-between items-center border-b border-zinc-850 pb-1.5 font-mono text-[9px]">
                               <span className="text-yellow-400 font-bold uppercase">{p.month_label}</span>
-                              <span className="text-zinc-550">{new Date(p.created_at).toLocaleDateString('en-IN')}</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleUpdateSnapshot(p)}
+                                  className="text-zinc-400 hover:text-yellow-400 transition-colors font-bold text-[8px] uppercase"
+                                >
+                                  Update Snapshot
+                                </button>
+                                <span className="text-zinc-800">|</span>
+                                <button
+                                  onClick={() => handleReplaceSnapshot(p)}
+                                  className="text-zinc-400 hover:text-yellow-400 transition-colors font-bold text-[8px] uppercase"
+                                >
+                                  Replace Snapshot
+                                </button>
+                                <span className="text-zinc-800">|</span>
+                                <button
+                                  onClick={() => handleDeleteSnapshot(p.id)}
+                                  className="text-red-500 hover:text-red-400 transition-colors font-bold text-[8px] uppercase"
+                                >
+                                  Delete Snapshot
+                                </button>
+                              </div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-center text-[8px] font-mono text-zinc-500">
                               <div className="space-y-1">
