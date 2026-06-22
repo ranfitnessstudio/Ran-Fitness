@@ -39,58 +39,6 @@ import { MemberLoginModal } from '@/components/member-login-modal';
 import { CoachChat } from '@/components/coach-chat';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { VirtualTourModal } from '@/components/virtual-tour-modal';
-import dynamic from 'next/dynamic';
-
-const EquipmentSection = dynamic(() => import('@/components/sections/equipment-section'), {
-  loading: () => <div className="h-48 flex items-center justify-center text-zinc-500 font-mono text-xs">⚡ Preparing Gear...</div>,
-  ssr: false
-});
-
-const TrainersSection = dynamic(() => import('@/components/sections/trainers-section'), {
-  loading: () => <div className="h-48 flex items-center justify-center text-zinc-500 font-mono text-xs">⚡ Assembling Coaches...</div>,
-  ssr: false
-});
-
-const TransformationsSection = dynamic(() => import('@/components/sections/transformations-section'), {
-  loading: () => <div className="h-48 flex items-center justify-center text-zinc-500 font-mono text-xs">⚡ Loading Transformations...</div>,
-  ssr: false
-});
-
-const PlansSection = dynamic(() => import('@/components/sections/plans-section'), {
-  loading: () => <div className="h-48 flex items-center justify-center text-zinc-500 font-mono text-xs">⚡ Getting Pricing...</div>,
-  ssr: false
-});
-
-const LazySection: React.FC<{ children: React.ReactNode; minHeight?: string }> = ({ children, minHeight = '200px' }) => {
-  const [isInView, setIsInView] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={containerRef} style={{ minHeight: isInView ? 'auto' : minHeight }} className="w-full">
-      {isInView ? children : <div className="h-48 flex items-center justify-center text-zinc-550 font-mono text-xs uppercase tracking-wider">⚡ Loading section...</div>}
-    </div>
-  );
-};
-
 
 // Custom SVG Instagram icon
 const Instagram = ({ size = 18, className = "" }: { size?: number; className?: string }) => (
@@ -487,6 +435,9 @@ export default function Home() {
   const [hoveredPlanId, setHoveredPlanId] = useState<string | null>(null);
   const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
   const [equipmentFilter, setEquipmentFilter] = useState<'All' | 'Strength' | 'Cardio' | 'Functional'>('All');
+  const [activeEquipmentIdx, setActiveEquipmentIdx] = useState(0);
+  const [activeTrainerIdx, setActiveTrainerIdx] = useState(0);
+  const [activePlanIdx, setActivePlanIdx] = useState(0);
   
   // Theme state
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -1266,7 +1217,7 @@ export default function Home() {
               <section id="about" className="py-12 lg:py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden transition-colors duration-300">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
-              <div className="text-center max-w-3xl mx-auto mb-8 lg:mb-16 space-y-3">
+              <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
                 <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">WHY CHOOSE US</span>
                 <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white">
                   HYBRID PERFORMANCE ZONE
@@ -1343,7 +1294,7 @@ export default function Home() {
               360° VIRTUAL GYM TOUR — Premium Centerpiece Section
               ═══════════════════════════════════════════════════ */}
           {virtualTour && (
-            <section className="relative py-12 lg:py-28 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
+            <section className="relative py-24 md:py-32 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
               {/* Debug Badge */}
               <div className="absolute top-4 left-4 z-50 bg-red-600 text-white text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-1 rounded border border-red-500 shadow-lg">
                 VIRTUAL TOUR LOADED
@@ -1424,7 +1375,7 @@ export default function Home() {
                   </div>
                 ) : (
                   <>
-                  <div className="mt-6 lg:mt-12 max-w-3xl mx-auto space-y-8">
+                  <div className="mt-12 max-w-3xl mx-auto space-y-8">
                     {/* Widescreen Preview Card */}
                     <motion.div
                       initial={{ opacity: 0, y: 30 }}
@@ -1505,20 +1456,365 @@ export default function Home() {
             </section>
           )}
 
-          {/* Meet Your Coaches */}
-          <LazySection minHeight="450px">
-            <TrainersSection 
-              trainers={trainers} 
-              setSelectedTrainer={setSelectedTrainer} 
-              trackEvent={trackEvent} 
-            />
-          </LazySection>
+          {/* Equipment Showcase ("Powered by Aerofit") */}
+          <section id="equipment" className="py-12 lg:py-28 bg-zinc-100/50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              
+              <div className="flex flex-col lg:flex-row items-center justify-between mb-8 lg:mb-16 gap-4 lg:gap-6">
+                <div className="text-center lg:text-left">
+                  <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">THE ECOSYSTEM</span>
+                  <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white mt-1">
+                    AEROFIT GYM ECOSYSTEM
+                  </h2>
+                  <p className="text-zinc-650 dark:text-zinc-500 text-xs uppercase tracking-widest font-bold mt-2">
+                    ⚡ Powered by Aerofit Equipment Systems
+                  </p>
+                </div>
+                
+                {/* Filters */}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {['All', 'Strength', 'Cardio', 'Functional'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => { setEquipmentFilter(cat as any); setActiveEquipmentIdx(0); }}
+                      className={`px-4 py-2 rounded-full text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        equipmentFilter === cat 
+                          ? 'bg-yellow-400 text-black shadow-md' 
+                          : 'bg-white dark:bg-zinc-900 text-zinc-650 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Fitness Journey (Steps Timeline) */}
-          <section className="py-12 lg:py-24 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 overflow-hidden transition-colors duration-300">
+              {/* Desktop view */}
+              <div className="hidden lg:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredEquipment.map((eq) => (
+                  <EquipmentCard key={eq.id} eq={eq} />
+                ))}
+              </div>
+
+              {/* Mobile Equipment Carousel */}
+              <div className="lg:hidden flex flex-col items-center">
+                {filteredEquipment.length > 0 ? (
+                  <div className="w-full max-w-sm relative px-8 flex items-center justify-center min-h-[380px]">
+                    {/* Left Arrow */}
+                    <button
+                      onClick={() => setActiveEquipmentIdx((prev) => (prev > 0 ? prev - 1 : filteredEquipment.length - 1))}
+                      className="absolute left-0 p-2 text-zinc-400 hover:text-yellow-450 dark:hover:text-yellow-400 cursor-pointer z-10"
+                    >
+                      <ChevronRight className="rotate-180" size={24} />
+                    </button>
+
+                    {/* Card Swipe Area */}
+                    <div className="w-full overflow-hidden flex items-center justify-center">
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={filteredEquipment[activeEquipmentIdx]?.id || activeEquipmentIdx}
+                          initial={{ opacity: 0, x: 50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -50 }}
+                          transition={{ duration: 0.25 }}
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={0.2}
+                          onDragEnd={(e, info) => {
+                            const swipeThreshold = 50;
+                            if (info.offset.x < -swipeThreshold) {
+                              setActiveEquipmentIdx((prev) => (prev < filteredEquipment.length - 1 ? prev + 1 : 0));
+                            } else if (info.offset.x > swipeThreshold) {
+                              setActiveEquipmentIdx((prev) => (prev > 0 ? prev - 1 : filteredEquipment.length - 1));
+                            }
+                          }}
+                          className="w-full flex justify-center"
+                        >
+                          {filteredEquipment[activeEquipmentIdx] && (
+                            <EquipmentCard eq={filteredEquipment[activeEquipmentIdx]} />
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Right Arrow */}
+                    <button
+                      onClick={() => setActiveEquipmentIdx((prev) => (prev < filteredEquipment.length - 1 ? prev + 1 : 0))}
+                      className="absolute right-0 p-2 text-zinc-400 hover:text-yellow-450 dark:hover:text-yellow-400 cursor-pointer z-10"
+                    >
+                      <ChevronRight size={24} />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 italic text-center py-8 font-mono text-xs">No equipment available in this category.</p>
+                )}
+
+                {/* Pagination Dots */}
+                {filteredEquipment.length > 1 && (
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {filteredEquipment.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveEquipmentIdx(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          activeEquipmentIdx === idx ? 'w-4 bg-yellow-400' : 'w-1.5 bg-zinc-300 dark:bg-zinc-850'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </section>
+
+          {/* Meet Your Coaches */}
+          <section id="trainers" className="py-12 lg:py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               
               <div className="text-center max-w-3xl mx-auto mb-8 lg:mb-16 space-y-3">
+                <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">COACH SPOTLIGHT</span>
+                <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white">
+                  MEET YOUR COACHES
+                </h2>
+                <p className="text-zinc-650 dark:text-zinc-400 text-sm">
+                  Push your limits alongside our elite certified training crew. Hover cards to reveal tilt glow.
+                </p>
+              </div>
+
+              {/* Desktop view */}
+              <div className="hidden lg:grid grid-cols-3 gap-10 max-w-5xl mx-auto justify-items-center">
+                {trainers.map((trainer, idx) => (
+                  <motion.div
+                    key={trainer.id}
+                    initial={{ opacity: 0, y: 35 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: idx * 0.12 }}
+                    viewport={{ once: true }}
+                    onClick={() => { setSelectedTrainer(trainer); trackEvent('trainer_card_click'); }}
+                    className="relative rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/30 overflow-hidden cursor-pointer group hover:border-yellow-400/40 dark:hover:border-yellow-400/40 hover:-translate-y-1 transition-all duration-300 shadow-xl flex flex-col justify-between"
+                  >
+                    {/* Picture */}
+                    <div className="aspect-[3/4] overflow-hidden relative">
+                      <img
+                        src={trainer.image_url}
+                        alt={trainer.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
+                      
+                      {/* Designation overlay */}
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <span className="text-[10px] text-yellow-400 font-mono uppercase tracking-widest font-extrabold bg-zinc-950/80 px-2 py-1 rounded border border-zinc-900">
+                          {trainer.experience}
+                        </span>
+                        <h4 className="font-display text-lg font-black italic text-white uppercase mt-2">{trainer.name}</h4>
+                        <p className="text-zinc-300 text-xs">{trainer.designation}</p>
+                      </div>
+                    </div>
+
+                    {/* Trainer Achievement Badges inside Card */}
+                    <div className="p-4 bg-zinc-50 dark:bg-zinc-950/80 border-t border-zinc-150 dark:border-zinc-900 flex flex-wrap gap-1.5 min-h-[44px]">
+                      {trainer.badges && trainer.badges.map((badge, bIdx) => (
+                        <span 
+                          key={bIdx}
+                          className="bg-yellow-400/10 text-yellow-500 dark:text-yellow-400 border border-yellow-400/20 rounded-full px-2 py-0.5 text-[8px] font-mono uppercase font-bold tracking-wider"
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+                {trainers.length < 3 && Array.from({ length: 3 - trainers.length }).map((_, idx) => (
+                  <motion.div
+                    key={`placeholder-${idx}`}
+                    initial={{ opacity: 0, y: 35 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: (trainers.length + idx) * 0.12 }}
+                    viewport={{ once: true }}
+                    className="relative rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/20 overflow-hidden flex flex-col justify-center items-center min-h-[380px] w-full"
+                  >
+                    <div className="text-center space-y-3 p-6">
+                      <div className="w-16 h-16 rounded-full bg-yellow-400/10 flex items-center justify-center mx-auto">
+                        <Plus size={24} className="text-yellow-400" />
+                      </div>
+                      <h4 className="font-display text-lg font-black italic text-zinc-400 dark:text-zinc-600 uppercase">Coming Soon</h4>
+                      <p className="text-zinc-400 dark:text-zinc-600 text-xs">New coach joining the team</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Mobile view (Carousel) */}
+              <div className="lg:hidden flex flex-col items-center">
+                {(() => {
+                  const trainerSlides = [
+                    ...trainers.map((t) => ({ type: 'trainer' as const, data: t })),
+                    ...Array.from({ length: Math.max(0, 3 - trainers.length) }).map((_, idx) => ({ type: 'placeholder' as const, id: `placeholder-${idx}` }))
+                  ];
+                  const currentSlide = trainerSlides[activeTrainerIdx];
+                  if (!currentSlide) return null;
+
+                  return (
+                    <>
+                      <div className="w-full max-w-xs relative px-8 flex items-center justify-center min-h-[440px]">
+                        {/* Left Arrow */}
+                        <button
+                          onClick={() => setActiveTrainerIdx((prev) => (prev > 0 ? prev - 1 : trainerSlides.length - 1))}
+                          className="absolute left-0 p-2 text-zinc-400 hover:text-yellow-450 dark:hover:text-yellow-400 cursor-pointer z-10"
+                        >
+                          <ChevronRight className="rotate-180" size={24} />
+                        </button>
+
+                        {/* Card Swipe Area */}
+                        <div className="w-full overflow-hidden flex items-center justify-center">
+                          <AnimatePresence mode="wait">
+                            <motion.div
+                              key={currentSlide.type === 'trainer' ? currentSlide.data.id : currentSlide.id}
+                              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                              transition={{ duration: 0.25 }}
+                              drag="x"
+                              dragConstraints={{ left: 0, right: 0 }}
+                              dragElastic={0.2}
+                              onDragEnd={(e, info) => {
+                                const swipeThreshold = 50;
+                                if (info.offset.x < -swipeThreshold) {
+                                  setActiveTrainerIdx((prev) => (prev < trainerSlides.length - 1 ? prev + 1 : 0));
+                                } else if (info.offset.x > swipeThreshold) {
+                                  setActiveTrainerIdx((prev) => (prev > 0 ? prev - 1 : trainerSlides.length - 1));
+                                }
+                              }}
+                              className="w-full flex justify-center"
+                            >
+                              {currentSlide.type === 'trainer' ? (
+                                <div 
+                                  onClick={() => { setSelectedTrainer(currentSlide.data); trackEvent('trainer_card_click'); }}
+                                  className="relative rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/30 overflow-hidden cursor-pointer group hover:border-yellow-400/40 dark:hover:border-yellow-400/40 shadow-xl flex flex-col justify-between w-full max-w-[280px]"
+                                >
+                                  <div className="aspect-[3/4] overflow-hidden relative">
+                                    <img
+                                      src={currentSlide.data.image_url}
+                                      alt={currentSlide.data.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
+                                    <div className="absolute bottom-4 left-4 right-4">
+                                      <span className="text-[10px] text-yellow-400 font-mono uppercase tracking-widest font-extrabold bg-zinc-950/80 px-2 py-1 rounded border border-zinc-900">
+                                        {currentSlide.data.experience}
+                                      </span>
+                                      <h4 className="font-display text-lg font-black italic text-white uppercase mt-2">{currentSlide.data.name}</h4>
+                                      <p className="text-zinc-300 text-xs">{currentSlide.data.designation}</p>
+                                    </div>
+                                  </div>
+                                  <div className="p-4 bg-zinc-50 dark:bg-zinc-950/80 border-t border-zinc-150 dark:border-zinc-900 flex flex-wrap gap-1.5 min-h-[44px]">
+                                    {currentSlide.data.badges && currentSlide.data.badges.map((badge: string, bIdx: number) => (
+                                      <span 
+                                        key={bIdx}
+                                        className="bg-yellow-400/10 text-yellow-500 dark:text-yellow-400 border border-yellow-400/20 rounded-full px-2 py-0.5 text-[8px] font-mono uppercase font-bold tracking-wider"
+                                      >
+                                        {badge}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="relative rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/20 overflow-hidden flex flex-col justify-center items-center min-h-[380px] w-full max-w-[280px]">
+                                  <div className="text-center space-y-3 p-6">
+                                    <div className="w-16 h-16 rounded-full bg-yellow-400/10 flex items-center justify-center mx-auto">
+                                      <Plus size={24} className="text-yellow-400" />
+                                    </div>
+                                    <h4 className="font-display text-lg font-black italic text-zinc-400 dark:text-zinc-600 uppercase">Coming Soon</h4>
+                                    <p className="text-zinc-400 dark:text-zinc-600 text-xs">New coach joining the team</p>
+                                  </div>
+                                </div>
+                              )}
+                            </motion.div>
+                          </AnimatePresence>
+                        </div>
+
+                        {/* Right Arrow */}
+                        <button
+                          onClick={() => setActiveTrainerIdx((prev) => (prev < trainerSlides.length - 1 ? prev + 1 : 0))}
+                          className="absolute right-0 p-2 text-zinc-400 hover:text-yellow-450 dark:hover:text-yellow-400 cursor-pointer z-10"
+                        >
+                          <ChevronRight size={24} />
+                        </button>
+                      </div>
+
+                      {/* Pagination Dots */}
+                      {trainerSlides.length > 1 && (
+                        <div className="flex justify-center gap-1.5 mt-4">
+                          {trainerSlides.map((_, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setActiveTrainerIdx(idx)}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                activeTrainerIdx === idx ? 'w-4 bg-yellow-400' : 'w-1.5 bg-zinc-300 dark:bg-zinc-850'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Head Coach Highlight Spotlight */}
+              <div className="mt-16 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-2xl overflow-hidden p-6 md:p-12 flex flex-col md:flex-row items-center gap-8 relative shadow-2xl transition-colors duration-300">
+                <div className="absolute -left-12 -top-12 w-64 h-64 bg-yellow-400/5 rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="w-full md:w-1/3 aspect-[3/4] md:aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+                  <img
+                    src="https://images.unsplash.com/photo-1567013127542-490d757e51fc?auto=format&fit=crop&q=80&w=600"
+                    alt="Head Coach Vikram"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="flex-1 space-y-4">
+                  <span className="rounded bg-yellow-400 text-black px-3 py-1 text-[10px] font-black italic uppercase tracking-wider">
+                    HEAD COACH SPOTLIGHT
+                  </span>
+                  <h3 className="font-display text-3xl font-black italic uppercase tracking-wider text-zinc-900 dark:text-white">
+                    VIKRAM RAN
+                  </h3>
+                  <p className="text-zinc-650 dark:text-zinc-400 text-xs italic border-l-2 border-yellow-400 pl-4 font-mono">
+                    “Discipline beats motivation every single day. Motivation gets you started, but consistency builds the steel.”
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-2">
+                    <div>
+                      <strong className="text-yellow-500 dark:text-yellow-400">CERTIFICATIONS:</strong>
+                      <p className="text-zinc-500 dark:text-zinc-500 text-[10px] uppercase mt-1">IPF Certified, Bodybuilding Recomp Lead</p>
+                    </div>
+                    <div>
+                      <strong className="text-yellow-500 dark:text-yellow-400">EXPERIENCE:</strong>
+                      <p className="text-zinc-500 dark:text-zinc-500 text-[10px] uppercase mt-1">10+ Years Heavy Comp Coaching</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => openBooking('Spotlight Session')}
+                    className="inline-flex items-center gap-2 rounded-lg bg-yellow-400 text-black px-6 py-3 text-xs font-black italic uppercase hover:bg-yellow-300 transition-all cursor-pointer"
+                  >
+                    BOOK COACH ASSESSMENT
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* Fitness Journey (Steps Timeline) */}
+          <section className="py-24 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 overflow-hidden transition-colors duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              
+              <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
                 <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">YOUR PATHWAY</span>
                 <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white">
                   THE TRANSFORMATION TIMELINE
@@ -1558,23 +1854,334 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Transformation Wall & Reviews */}
-              <LazySection minHeight="500px">
-                <TransformationsSection 
-                  transformations={transformations} 
-                  googleReviews={googleReviews} 
-                />
-              </LazySection>
+          {/* Transformation Wall */}
+          <section id="transformations" className="py-12 lg:py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-100/50 dark:bg-zinc-950/40 relative overflow-hidden transition-colors duration-300">
+            {/* Background Image Overlay */}
+            <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.06] dark:opacity-[0.09] mix-blend-luminosity grayscale bg-cover bg-center" style={{ backgroundImage: `url('/images/vascular_gym_muscles.png')` }} />
+            
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+              
+              <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+                <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">COMMUNITY STRENGTH</span>
+                <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white">
+                  TRANSFORMATION WALL
+                </h2>
+                <p className="text-zinc-650 dark:text-zinc-400 text-sm">
+                  Drag the center line on our slider to visualize the fitness results achieved by our members.
+                </p>
+              </div>
 
-          {/* Membership Plans */}
-          <LazySection minHeight="450px">
-            <PlansSection 
-              plans={plans} 
-              openBooking={openBooking} 
-            />
-          </LazySection>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {transformations.map((trans) => (
+                  <div key={trans.id} className="space-y-4">
+                    <BeforeAfterSlider 
+                      beforeImage={trans.before_image} 
+                      afterImage={trans.after_image}
+                      beforeLabel="Start Form"
+                      afterLabel={trans.weight_lost || 'Transformed'}
+                    />
+                    <div className="p-4 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-900 rounded-xl space-y-2 shadow-md">
+                      <h4 className="font-display font-black text-lg italic text-zinc-900 dark:text-white uppercase">{trans.member_name}</h4>
+                      <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">{trans.story}</p>
+                      <div className="flex gap-4 text-[10px] font-mono text-yellow-500 dark:text-yellow-400 uppercase tracking-wider font-extrabold">
+                        {trans.weight_lost && <span>💥 {trans.weight_lost}</span>}
+                        {trans.muscle_gained && <span>💪 {trans.muscle_gained}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </section>
+
+          {/* C. Trusted by Our Members (Google Reviews test) */}
+          <section className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              
+              <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-6">
+                <div>
+                  <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">SOCIAL PROOF</span>
+                  <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white mt-1">
+                    TRUSTED BY OUR MEMBERS
+                  </h2>
+                  <p className="text-zinc-650 dark:text-zinc-400 text-sm mt-2">
+                    Honest feedback from local Habsiguda gym members. (Connected to Maps API)
+                  </p>
+                </div>
+
+                {/* Rating badge */}
+                <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-lg">
+                  <div className="text-3xl font-black italic font-display text-yellow-500 dark:text-yellow-400">4.9</div>
+                  <div className="text-xs">
+                    <div className="flex text-yellow-500 dark:text-yellow-400">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} size={14} className="fill-yellow-500 dark:fill-yellow-400" />
+                      ))}
+                    </div>
+                    <div className="text-zinc-500 font-mono text-[9px] uppercase tracking-wider font-bold mt-1">
+                      342 Reviews on Google
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Review cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {googleReviews.map((rev, idx) => (
+                  <div key={idx} className="p-6 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-900 rounded-xl relative flex flex-col justify-between space-y-4 shadow-md">
+                    <div className="space-y-3">
+                      <div className="flex text-yellow-500 dark:text-yellow-400">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} size={12} className="fill-yellow-500 dark:fill-yellow-400" />
+                        ))}
+                      </div>
+                      <p className="text-zinc-700 dark:text-zinc-300 text-xs leading-relaxed">"{rev.text}"</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 pt-3 border-t border-zinc-150 dark:border-zinc-900/50">
+                      <div className="h-8 w-8 rounded-full bg-yellow-400 text-black font-extrabold text-xs flex items-center justify-center">
+                        {rev.avatar}
+                      </div>
+                      <div>
+                        <strong className="text-zinc-900 dark:text-white text-xs block">{rev.name}</strong>
+                        <span className="text-zinc-500 text-[10px] font-mono">{rev.relativeTime}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </section>
             </>
           )}
+
+          {/* Membership Plans */}
+          <section id="plans" className="py-12 lg:py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              
+              <div className="text-center max-w-3xl mx-auto mb-8 lg:mb-16 space-y-3">
+                <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">AFFORDABLE RATES</span>
+                <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white">
+                  MEMBERSHIP PLANS
+                </h2>
+                <p className="text-zinc-650 dark:text-zinc-400 text-sm">
+                  Select your tier and unlock premium access. Hover over cards to load weights.
+                </p>
+              </div>
+
+              {/* Desktop view */}
+              <div className="hidden lg:grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                {plans.map((plan) => {
+                  const isHovered = hoveredPlanId === plan.id;
+                  return (
+                    <motion.div
+                      key={plan.id}
+                      onMouseEnter={() => setHoveredPlanId(plan.id)}
+                      onMouseLeave={() => setHoveredPlanId(null)}
+                      whileHover={{ scale: 1.02 }}
+                      className={`relative rounded-xl p-8 border flex flex-col justify-between shadow-lg ${
+                        plan.popular_badge 
+                          ? 'border-yellow-400 bg-white dark:bg-zinc-900/50 shadow-[0_0_30px_rgba(250,204,21,0.05)]' 
+                          : 'border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/20'
+                      }`}
+                    >
+                      {plan.popular_badge && (
+                        <span className="absolute top-0 right-8 -translate-y-1/2 rounded bg-yellow-400 text-black px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest">
+                          MOST POPULAR
+                        </span>
+                      )}
+
+                      <div className="space-y-4">
+                        <h3 className="font-display text-xl font-black italic uppercase text-zinc-900 dark:text-white">{plan.name}</h3>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-display text-4xl font-black italic text-yellow-500 dark:text-yellow-400">₹{plan.price}</span>
+                          <span className="text-zinc-500 text-xs">/ {plan.duration}</span>
+                        </div>
+                        
+                        <hr className="border-zinc-150 dark:border-zinc-900" />
+                        
+                        <ul className="space-y-3 pt-2">
+                          {plan.benefits.map((b, bIdx) => (
+                            <li key={bIdx} className="flex items-start gap-2.5 text-xs text-zinc-700 dark:text-zinc-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 dark:bg-yellow-400 mt-1.5 flex-shrink-0" />
+                              <span>{b}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="mt-8 space-y-4">
+                        <div className="h-12 flex items-center justify-center">
+                          {isHovered ? (
+                            <motion.div 
+                              initial={{ opacity: 0, scale: 0.8 }} 
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="flex items-center gap-1 text-yellow-500 dark:text-yellow-400 font-mono text-[9px] uppercase tracking-wider"
+                            >
+                              <Dumbbell className="animate-bounce" size={14} />
+                              BARBELL LOADING...
+                            </motion.div>
+                          ) : (
+                            <div className="h-[1px] w-12 bg-zinc-200 dark:bg-zinc-900" />
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => openBooking(`Plan: ${plan.name}`)}
+                          className={`w-full text-center rounded-lg py-3 text-xs font-black italic uppercase tracking-widest transition-all cursor-pointer ${
+                            plan.popular_badge 
+                              ? 'bg-yellow-400 text-black hover:bg-yellow-300 shadow-md' 
+                              : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-250 dark:border-zinc-800'
+                          }`}
+                        >
+                          SELECT PLAN
+                        </button>
+                      </div>
+
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Mobile View (Carousel) */}
+              <div className="lg:hidden flex flex-col items-center">
+                {plans.length > 0 ? (
+                  <div className="w-full max-w-sm relative px-8 flex items-center justify-center min-h-[460px]">
+                    {/* Left Arrow */}
+                    <button
+                      onClick={() => setActivePlanIdx((prev) => (prev > 0 ? prev - 1 : plans.length - 1))}
+                      className="absolute left-0 p-2 text-zinc-400 hover:text-yellow-450 dark:hover:text-yellow-400 cursor-pointer z-10"
+                    >
+                      <ChevronRight className="rotate-180" size={24} />
+                    </button>
+
+                    {/* Card Swipe Area */}
+                    <div className="w-full overflow-hidden flex items-center justify-center">
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={plans[activePlanIdx]?.id || activePlanIdx}
+                          initial={{ opacity: 0, x: 50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -50 }}
+                          transition={{ duration: 0.25 }}
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={0.2}
+                          onDragEnd={(e, info) => {
+                            const swipeThreshold = 50;
+                            if (info.offset.x < -swipeThreshold) {
+                              setActivePlanIdx((prev) => (prev < plans.length - 1 ? prev + 1 : 0));
+                            } else if (info.offset.x > swipeThreshold) {
+                              setActivePlanIdx((prev) => (prev > 0 ? prev - 1 : plans.length - 1));
+                            }
+                          }}
+                          className="w-full flex justify-center"
+                        >
+                          {(() => {
+                            const plan = plans[activePlanIdx];
+                            if (!plan) return null;
+                            const isHovered = hoveredPlanId === plan.id;
+                            return (
+                              <div
+                                onMouseEnter={() => setHoveredPlanId(plan.id)}
+                                onMouseLeave={() => setHoveredPlanId(null)}
+                                className={`relative rounded-xl p-8 border flex flex-col justify-between shadow-lg w-full max-w-[280px] ${
+                                  plan.popular_badge 
+                                    ? 'border-yellow-400 bg-white dark:bg-zinc-900/50 shadow-[0_0_30px_rgba(250,204,21,0.05)]' 
+                                    : 'border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/20'
+                                }`}
+                              >
+                                {plan.popular_badge && (
+                                  <span className="absolute top-0 right-8 -translate-y-1/2 rounded bg-yellow-400 text-black px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest">
+                                    MOST POPULAR
+                                  </span>
+                                )}
+
+                                <div className="space-y-4">
+                                  <h3 className="font-display text-xl font-black italic uppercase text-zinc-900 dark:text-white">{plan.name}</h3>
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="font-display text-4xl font-black italic text-yellow-500 dark:text-yellow-400">₹{plan.price}</span>
+                                    <span className="text-zinc-500 text-xs">/ {plan.duration}</span>
+                                  </div>
+                                  
+                                  <hr className="border-zinc-150 dark:border-zinc-900" />
+                                  
+                                  <ul className="space-y-3 pt-2">
+                                    {plan.benefits.map((b, bIdx) => (
+                                      <li key={bIdx} className="flex items-start gap-2.5 text-xs text-zinc-700 dark:text-zinc-300">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 dark:bg-yellow-400 mt-1.5 flex-shrink-0" />
+                                        <span>{b}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+
+                                <div className="mt-8 space-y-4">
+                                  <div className="h-12 flex items-center justify-center">
+                                    {isHovered ? (
+                                      <motion.div 
+                                        initial={{ opacity: 0, scale: 0.8 }} 
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="flex items-center gap-1 text-yellow-500 dark:text-yellow-400 font-mono text-[9px] uppercase tracking-wider"
+                                      >
+                                        <Dumbbell className="animate-bounce" size={14} />
+                                        BARBELL LOADING...
+                                      </motion.div>
+                                    ) : (
+                                      <div className="h-[1px] w-12 bg-zinc-200 dark:bg-zinc-900" />
+                                    )}
+                                  </div>
+
+                                  <button
+                                    onClick={() => openBooking(`Plan: ${plan.name}`)}
+                                    className={`w-full text-center rounded-lg py-3 text-xs font-black italic uppercase tracking-widest transition-all cursor-pointer ${
+                                      plan.popular_badge 
+                                        ? 'bg-yellow-400 text-black hover:bg-yellow-300 shadow-md' 
+                                        : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-250 dark:border-zinc-800'
+                                    }`}
+                                  >
+                                    SELECT PLAN
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Right Arrow */}
+                    <button
+                      onClick={() => setActivePlanIdx((prev) => (prev < plans.length - 1 ? prev + 1 : 0))}
+                      className="absolute right-0 p-2 text-zinc-400 hover:text-yellow-450 dark:hover:text-yellow-400 cursor-pointer z-10"
+                    >
+                      <ChevronRight size={24} />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 italic text-center py-8 font-mono text-xs">No plans configured.</p>
+                )}
+
+                {/* Pagination Dots */}
+                {plans.length > 1 && (
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {plans.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActivePlanIdx(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          activePlanIdx === idx ? 'w-4 bg-yellow-400' : 'w-1.5 bg-zinc-300 dark:bg-zinc-850'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </section>
 
           {isIdleLoaded && (
             <>
@@ -1583,7 +2190,7 @@ export default function Home() {
             <section className="py-12 lg:py-28 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
               <div className="max-w-7xl mx-auto px-4 sm:px-6">
                 
-                <div className="text-center max-w-3xl mx-auto mb-8 lg:mb-16 space-y-3">
+                <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
                   <span className="text-yellow-400 font-mono text-xs uppercase tracking-widest font-bold">GYM EVENTS</span>
                   <h2 className="font-display text-3xl md:text-5xl font-black italic uppercase text-zinc-900 dark:text-white">
                     UPCOMING EVENTS & CHALLENGES
@@ -1631,7 +2238,7 @@ export default function Home() {
           )}
 
           {/* Scroll-Triggered Premium Statistics */}
-          <section className="py-10 lg:py-20 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 relative transition-colors duration-300">
+          <section className="py-20 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 relative transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <StatCounter value="1200" label="Active Members" suffix="+" />
@@ -1644,7 +2251,7 @@ export default function Home() {
           </section>
 
           {/* E. Career Hiring portal ("Join Our Team") */}
-          <section className="py-12 lg:py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-100/30 dark:bg-zinc-950/20 relative overflow-hidden transition-colors duration-300">
+          <section className="py-24 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-100/30 dark:bg-zinc-950/20 relative overflow-hidden transition-colors duration-300">
             {/* Background Image Overlay */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05] mix-blend-luminosity grayscale bg-cover bg-center" style={{ backgroundImage: `url('/images/vascular_gym_muscles.png')` }} />
             
@@ -1745,7 +2352,7 @@ export default function Home() {
           </section>
 
           {/* Call To Action Ending */}
-          <section className="relative py-12 lg:py-28 overflow-hidden bg-zinc-100 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
+          <section className="relative py-12 lg:py-28 pb-36 lg:pb-28 overflow-hidden bg-zinc-100 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 transition-colors duration-300">
             <div className="absolute inset-0 energy-glow pointer-events-none opacity-20 dark:opacity-100" />
             <div className="relative z-10 max-w-4xl mx-auto px-4 text-center space-y-6">
               

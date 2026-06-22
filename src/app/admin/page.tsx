@@ -2235,8 +2235,8 @@ ${xmlRows}
                     </tbody>
                   </table>
 
-                  {/* Mobile view */}
-                  <div className="block lg:hidden space-y-4">
+                  {/* Mobile view cards */}
+                  <div className="lg:hidden space-y-4">
                     {(() => {
                       const filtered = members.filter(m =>
                         m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
@@ -2244,75 +2244,81 @@ ${xmlRows}
                         m.phone.includes(memberSearchQuery)
                       );
                       if (filtered.length === 0) {
-                        return <p className="text-zinc-500 dark:text-zinc-400 italic text-center py-4">No gym members found.</p>;
+                        return <p className="text-center text-zinc-500 italic py-4">No gym members registered.</p>;
                       }
                       return filtered.map((m) => (
-                        <div key={m.id} className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-4 space-y-3 shadow-xs">
-                          {/* Top Row: ID & Status */}
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-yellow-500">{m.member_id}</span>
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                              m.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200/20' :
-                              m.status === 'Expiring Soon' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400 border border-yellow-200/20' :
-                              m.status === 'Suspended' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-200/20' :
-                              'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200/20'
+                        <div key={m.id} className="bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-900 p-4 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-[10px] font-bold text-yellow-500 tracking-wider font-mono">{m.member_id}</span>
+                              <h5 className="text-sm font-sans font-bold text-zinc-900 dark:text-white mt-0.5">{m.name}</h5>
+                              <span className="text-[9px] uppercase tracking-widest font-mono text-zinc-450 dark:text-zinc-500">{m.membership_type}</span>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              m.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/20' :
+                              m.status === 'Expiring Soon' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800/20' :
+                              m.status === 'Suspended' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800/20' :
+                              'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800/20'
                             }`}>
                               {m.status}
                             </span>
                           </div>
-
-                          {/* Member Info */}
-                          <div className="space-y-1">
-                            <h4 className="font-sans font-bold text-sm text-zinc-900 dark:text-white leading-tight">{m.name}</h4>
-                            <p className="text-zinc-500 text-[10px]">Plan: <span className="uppercase font-bold text-zinc-700 dark:text-zinc-300">{m.membership_type}</span></p>
-                            <p className="text-zinc-500 text-[10px]">Phone: <span className="text-zinc-700 dark:text-zinc-350">{m.phone}</span></p>
-                            <p className="text-zinc-500 text-[10px]">Joined: <span className="text-zinc-700 dark:text-zinc-350">{m.start_date}</span></p>
-                            <p className="text-zinc-500 text-[10px]">Expires: <span className="font-bold text-zinc-700 dark:text-zinc-300">{m.end_date}</span></p>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-650 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-900 pt-2">
+                            <div>
+                              <span className="text-zinc-400 font-bold block">Phone:</span>
+                              <span className="font-mono">{m.phone}</span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400 font-bold block">Joined:</span>
+                              <span className="font-mono">{m.start_date}</span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400 font-bold block">Expires:</span>
+                              <span className="font-mono font-bold text-zinc-800 dark:text-zinc-250">{m.end_date}</span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400 font-bold block">Email:</span>
+                              <span className="truncate block font-mono" title={m.email}>{m.email || 'N/A'}</span>
+                            </div>
                           </div>
 
-                          {/* Actions Area */}
-                          <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800/80 flex flex-wrap gap-2 justify-start">
+                          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-900 text-[9px] font-bold font-mono">
                             <button
                               onClick={() => {
                                 setEditingMember(m);
                                 setIsAddMemberOpen(true);
                               }}
-                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-750 dark:text-zinc-300 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-yellow-450 dark:bg-yellow-400 text-black hover:bg-yellow-300 rounded uppercase cursor-pointer transition-all"
                             >
                               Edit
                             </button>
                             <button
-                              onClick={() => handleOpenDietModal(m)}
-                              className="px-2.5 py-1.5 bg-green-100/50 dark:bg-green-950/30 hover:bg-green-150 text-green-700 dark:text-green-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
-                            >
-                              Diet
-                            </button>
-                            <button
                               onClick={() => handleOpenWorkoutModal(m)}
-                              className="px-2.5 py-1.5 bg-yellow-100/50 dark:bg-yellow-950/30 hover:bg-yellow-150 text-yellow-750 dark:text-yellow-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 rounded uppercase cursor-pointer transition-all"
                             >
                               Workout
                             </button>
                             <button
-                              onClick={() => handleOpenNoteModal(m)}
-                              className="px-2.5 py-1.5 bg-purple-100/50 dark:bg-purple-950/30 hover:bg-purple-150 text-purple-750 dark:text-purple-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              onClick={() => handleOpenDietModal(m)}
+                              className="px-2 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 rounded uppercase cursor-pointer transition-all"
                             >
-                              Note
+                              Diet
                             </button>
                             <button
                               onClick={() => {
                                 setProgressMemberId(m.member_id);
                                 setIsAddProgressOpen(true);
                               }}
-                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-755 dark:text-zinc-300 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 rounded uppercase cursor-pointer transition-all"
                             >
-                              Metrics
+                              Progress
                             </button>
                             <button
                               onClick={() => handleOpenRecoveryModal(m)}
-                              className="px-2.5 py-1.5 bg-red-100/50 dark:bg-red-950/30 hover:bg-red-150 text-red-750 dark:text-red-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 rounded uppercase cursor-pointer transition-all"
                             >
-                              Recovery
+                              Recover
                             </button>
                             <button
                               onClick={() => {
@@ -2342,13 +2348,13 @@ ${xmlRows}
                                   }).catch(err => showToastMessage(err.message || 'Renewal failed', 'error'));
                                 }
                               }}
-                              className="px-2.5 py-1.5 bg-blue-100/50 dark:bg-blue-950/30 hover:bg-blue-150 text-blue-750 dark:text-blue-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-yellow-400 rounded uppercase cursor-pointer transition-all"
                             >
                               Renew
                             </button>
                             <button
                               onClick={() => handleDeleteMember(m.id!)}
-                              className="px-2.5 py-1.5 bg-red-650 hover:bg-red-700 text-white rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-red-950/20 text-red-500 hover:bg-red-950/40 rounded uppercase cursor-pointer ml-auto transition-all"
                             >
                               Delete
                             </button>
@@ -2408,7 +2414,7 @@ ${xmlRows}
 
                   <div className="overflow-x-auto text-[10px] font-mono">
                     {/* Desktop view */}
-                    <table className="hidden md:table w-full text-left">
+                    <table className="hidden lg:table w-full text-left">
                       <thead>
                         <tr className="border-b border-zinc-200 dark:border-zinc-900 text-zinc-400 pb-1.5 uppercase">
                           <th className="pb-1.5">Day</th>
@@ -2435,7 +2441,7 @@ ${xmlRows}
                     </table>
 
                     {/* Mobile View Cards */}
-                    <div className="block md:hidden space-y-3">
+                    <div className="block lg:hidden space-y-3">
                       {workoutSchedule.map((w) => (
                         <div key={w.day} className="bg-zinc-950 p-3 border border-zinc-900 rounded-lg flex justify-between items-center text-xs">
                           <div>
@@ -2733,7 +2739,7 @@ ${xmlRows}
 
               <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl overflow-hidden shadow-xl">
                 {/* Desktop View */}
-                <table className="hidden md:table w-full text-left border-collapse text-xs">
+                <table className="hidden lg:table w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono border-b border-zinc-200 dark:border-zinc-800 uppercase text-[10px]">
                       <th className="p-4 font-bold">Applicant Name</th>
@@ -2779,7 +2785,7 @@ ${xmlRows}
                 </table>
 
                 {/* Mobile Careers view */}
-                <div className="block md:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
+                <div className="block lg:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
                   {careers.map((app) => (
                     <div key={app.id} className="p-4 bg-zinc-950/20 space-y-3">
                       <div className="flex justify-between items-start">
@@ -3780,7 +3786,7 @@ ${xmlRows}
                   </h4>
                   <div className="overflow-x-auto text-[10px] font-mono">
                     {/* Desktop View */}
-                    <table className="hidden md:table w-full text-left">
+                    <table className="hidden lg:table w-full text-left">
                       <thead>
                         <tr className="border-b border-zinc-200 dark:border-zinc-900 text-zinc-400 pb-2 uppercase tracking-wider">
                           <th className="pb-2">Timestamp</th>
@@ -3838,7 +3844,7 @@ ${xmlRows}
                     </table>
 
                     {/* Mobile AI Logs view */}
-                    <div className="block md:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
+                    <div className="block lg:hidden divide-y divide-zinc-200 dark:divide-zinc-905">
                       {aiMetrics.slice(0, 10).map((m, index) => {
                         const dateStr = new Date(m.created_at).toLocaleString('en-IN', {
                           timeZone: 'Asia/Kolkata',
