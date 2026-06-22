@@ -2095,7 +2095,7 @@ ${xmlRows}
                 
                 <div className="overflow-x-auto text-[11px] font-mono">
                   {/* Desktop view */}
-                  <table className="hidden md:table w-full text-left">
+                  <table className="hidden lg:table w-full text-left">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-900 text-zinc-400 pb-2 uppercase tracking-wider">
                         <th className="pb-2">Member ID</th>
@@ -2234,6 +2234,129 @@ ${xmlRows}
                       )}
                     </tbody>
                   </table>
+
+                  {/* Mobile view */}
+                  <div className="block lg:hidden space-y-4">
+                    {(() => {
+                      const filtered = members.filter(m =>
+                        m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                        m.member_id.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                        m.phone.includes(memberSearchQuery)
+                      );
+                      if (filtered.length === 0) {
+                        return <p className="text-zinc-500 dark:text-zinc-400 italic text-center py-4">No gym members found.</p>;
+                      }
+                      return filtered.map((m) => (
+                        <div key={m.id} className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-4 space-y-3 shadow-xs">
+                          {/* Top Row: ID & Status */}
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-yellow-500">{m.member_id}</span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                              m.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200/20' :
+                              m.status === 'Expiring Soon' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400 border border-yellow-200/20' :
+                              m.status === 'Suspended' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-200/20' :
+                              'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200/20'
+                            }`}>
+                              {m.status}
+                            </span>
+                          </div>
+
+                          {/* Member Info */}
+                          <div className="space-y-1">
+                            <h4 className="font-sans font-bold text-sm text-zinc-900 dark:text-white leading-tight">{m.name}</h4>
+                            <p className="text-zinc-500 text-[10px]">Plan: <span className="uppercase font-bold text-zinc-700 dark:text-zinc-300">{m.membership_type}</span></p>
+                            <p className="text-zinc-500 text-[10px]">Phone: <span className="text-zinc-700 dark:text-zinc-350">{m.phone}</span></p>
+                            <p className="text-zinc-500 text-[10px]">Joined: <span className="text-zinc-700 dark:text-zinc-350">{m.start_date}</span></p>
+                            <p className="text-zinc-500 text-[10px]">Expires: <span className="font-bold text-zinc-700 dark:text-zinc-300">{m.end_date}</span></p>
+                          </div>
+
+                          {/* Actions Area */}
+                          <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800/80 flex flex-wrap gap-2 justify-start">
+                            <button
+                              onClick={() => {
+                                setEditingMember(m);
+                                setIsAddMemberOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-750 dark:text-zinc-300 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleOpenDietModal(m)}
+                              className="px-2.5 py-1.5 bg-green-100/50 dark:bg-green-950/30 hover:bg-green-150 text-green-700 dark:text-green-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Diet
+                            </button>
+                            <button
+                              onClick={() => handleOpenWorkoutModal(m)}
+                              className="px-2.5 py-1.5 bg-yellow-100/50 dark:bg-yellow-950/30 hover:bg-yellow-150 text-yellow-750 dark:text-yellow-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Workout
+                            </button>
+                            <button
+                              onClick={() => handleOpenNoteModal(m)}
+                              className="px-2.5 py-1.5 bg-purple-100/50 dark:bg-purple-950/30 hover:bg-purple-150 text-purple-750 dark:text-purple-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Note
+                            </button>
+                            <button
+                              onClick={() => {
+                                setProgressMemberId(m.member_id);
+                                setIsAddProgressOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-755 dark:text-zinc-300 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Metrics
+                            </button>
+                            <button
+                              onClick={() => handleOpenRecoveryModal(m)}
+                              className="px-2.5 py-1.5 bg-red-100/50 dark:bg-red-950/30 hover:bg-red-150 text-red-750 dark:text-red-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Recovery
+                            </button>
+                            <button
+                              onClick={() => {
+                                const confirmRenew = confirm(`Renew ${m.name}'s membership plan?`);
+                                if (confirmRenew) {
+                                  const today = new Date().toISOString().split('T')[0];
+                                  const pId = m.plan_id || plans.find(p => p.name === m.membership_type || p.duration === m.membership_type)?.id || 'p1';
+                                  const selectedPlan = plans.find(p => p.id === pId);
+                                  let days = 30;
+                                  if (selectedPlan) {
+                                    const dur = selectedPlan.duration.toLowerCase();
+                                    if (dur.includes('monthly')) days = 30;
+                                    else if (dur.includes('quarterly')) days = 90;
+                                    else if (dur.includes('half-yearly')) days = 180;
+                                    else if (dur.includes('yearly') || dur.includes('annual')) days = 365;
+                                  }
+                                  const end = new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
+                                  db.saveMember({
+                                    ...m,
+                                    start_date: today,
+                                    end_date: end,
+                                    status: 'Active',
+                                    notes: 'RENEWAL'
+                                  }).then(() => {
+                                    showToastMessage(`✅ Membership plan for ${m.name} renewed!`);
+                                    db.getMembers().then(setMembers);
+                                  }).catch(err => showToastMessage(err.message || 'Renewal failed', 'error'));
+                                }
+                              }}
+                              className="px-2.5 py-1.5 bg-blue-100/50 dark:bg-blue-950/30 hover:bg-blue-150 text-blue-750 dark:text-blue-400 rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Renew
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMember(m.id!)}
+                              className="px-2.5 py-1.5 bg-red-650 hover:bg-red-700 text-white rounded text-[9px] uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
 
