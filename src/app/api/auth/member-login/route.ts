@@ -4,29 +4,44 @@ import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { phone, password } = body;
+    const body = await request.json().catch(() => ({}));
+    const identifier = body.identifier || body.email || body.phone;
+    const { password } = body;
 
-    if (!phone || !password) {
+    if (!identifier || !password) {
       return NextResponse.json(
-        { success: false, error: 'Phone number and Password are required.' },
+        { success: false, error: 'Identifier (Email/Phone) and Password are required.' },
         { status: 400 }
       );
     }
 
-    const { validatePhone } = require('@/lib/validation');
-    if (!validatePhone(phone)) {
-      return NextResponse.json(
-        { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
-        { status: 400 }
-      );
+    const isEmail = identifier.includes('@');
+    if (isEmail) {
+      const { validateEmail } = require('@/lib/validation');
+      if (!validateEmail(identifier)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid email address format.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      const { validatePhone } = require('@/lib/validation');
+      if (!validatePhone(identifier)) {
+        return NextResponse.json(
+          { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Retrieve member
-    const member = await db.getMemberByPhone(phone);
+    const member = isEmail
+      ? await db.getMemberByEmail(identifier)
+      : await db.getMemberByPhone(identifier);
+
     if (!member) {
       return NextResponse.json(
-        { success: false, error: 'Invalid phone number or password.' },
+        { success: false, error: 'Invalid identifier or password.' },
         { status: 401 }
       );
     }
@@ -43,7 +58,7 @@ export async function POST(request: Request) {
     const passwordMatch = await bcrypt.compare(password, member.password_hash);
     if (!passwordMatch) {
       return NextResponse.json(
-        { success: false, error: 'Invalid phone number or password.' },
+        { success: false, error: 'Invalid identifier or password.' },
         { status: 401 }
       );
     }

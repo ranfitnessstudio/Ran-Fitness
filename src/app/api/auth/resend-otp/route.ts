@@ -17,6 +17,67 @@ export async function POST(request: Request) {
 
     const selectedPurpose = purpose || 'LOGIN';
 
+    if (selectedPurpose === 'FORGOT_PASSWORD') {
+      const token = await db.getPasswordResetToken(email);
+      if (!token) {
+        return NextResponse.json(
+          { success: false, error: 'No active recovery session found. Please start over.' },
+          { status: 400 }
+        );
+      }
+
+      // Cooldown check (60 seconds)
+      const timeSinceLastSent = Date.now() - new Date(token.last_sent_at).getTime();
+      if (timeSinceLastSent < 60 * 1000) {
+        const waitSeconds = Math.ceil((60 * 1000 - timeSinceLastSent) / 1000);
+        return NextResponse.json(
+          { success: false, error: `Please wait ${waitSeconds} seconds before requesting another code.` },
+          { status: 400 }
+        );
+      }
+
+      // Resend count check (max 3 resends)
+      if (token.resend_count >= 3) {
+        return NextResponse.json(
+          { success: false, error: 'Maximum resend limit reached. Please request a new recovery OTP.' },
+          { status: 400 }
+        );
+      }
+
+      // Generate new OTP
+      const crypto = require('crypto');
+      let otpVal: number;
+      try {
+        otpVal = crypto.randomInt(100000, 999999);
+      } catch {
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        otpVal = 100000 + (array[0] % 900000);
+      }
+      const otp = String(otpVal);
+
+      const hashedOtp = await bcrypt.hash(otp, 10);
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // Reset to 5 mins
+
+      // Update reset token
+      await db.incrementResetTokenResends(token.id, hashedOtp, expiresAt);
+
+      // Send OTP email
+      await sendOtpEmail(email, otp);
+
+      const responsePayload: any = {
+        success: true,
+        message: 'Verification code resent successfully.',
+        email
+      };
+
+      if (process.env.NODE_ENV === 'development') {
+        responsePayload.otp = otp;
+      }
+
+      return NextResponse.json(responsePayload);
+    }
+
     // Retrieve active OTP record
     const otpRecord = await db.getOtpEntry(email, selectedPurpose);
     if (!otpRecord) {

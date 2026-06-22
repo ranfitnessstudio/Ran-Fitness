@@ -45,9 +45,9 @@ export async function POST(request: Request) {
       let member: any = null;
 
       if (selectedPurpose === 'REGISTER') {
-        if (!registrationData || !registrationData.name || !registrationData.phone) {
+        if (!registrationData || !registrationData.name || !registrationData.phone || !registrationData.password) {
           return NextResponse.json(
-            { success: false, error: 'Registration details are missing.' },
+            { success: false, error: 'Registration details (including password) are missing.' },
             { status: 400 }
           );
         }
@@ -69,11 +69,15 @@ export async function POST(request: Request) {
           );
         }
 
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(registrationData.password, 10);
+
         // Create Member
         member = await db.createMemberWithOtp({
           name: registrationData.name,
           email,
-          phone: registrationData.phone
+          phone: registrationData.phone,
+          password_hash: hashedPassword
         });
 
         // Dispatch Welcome Email

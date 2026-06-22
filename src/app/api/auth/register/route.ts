@@ -6,12 +6,27 @@ import { sendOtpEmail } from '@/lib/email';
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { name, email, phone } = body;
+    const { name, email, phone, password, confirmPassword } = body;
 
     // Standard validations
-    if (!name || !email || !phone) {
+    if (!name || !email || !phone || !password || !confirmPassword) {
       return NextResponse.json(
-        { success: false, error: 'Full name, email, and phone number are required.' },
+        { success: false, error: 'Full name, email, phone number, password, and confirm password are required.' },
+        { status: 400 }
+      );
+    }
+
+    if (password !== confirmPassword) {
+      return NextResponse.json(
+        { success: false, error: 'Passwords do not match.' },
+        { status: 400 }
+      );
+    }
+
+    const { validatePassword } = require('@/lib/validation');
+    if (!validatePassword(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 8 characters and contain uppercase, lowercase, numbers, and special characters.' },
         { status: 400 }
       );
     }

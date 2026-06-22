@@ -1,36 +1,36 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
 import bcrypt from 'bcryptjs';
+import { sendOtpEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { phone } = body;
+    const { email } = body;
 
-    if (!phone) {
+    if (!email) {
       return NextResponse.json(
-        { success: false, error: 'Phone number is required.' },
+        { success: false, error: 'Email address is required.' },
         { status: 400 }
       );
     }
 
-    const { validatePhone } = require('@/lib/validation');
-    if (!validatePhone(phone)) {
+    const { validateEmail } = require('@/lib/validation');
+    if (!validateEmail(email)) {
       return NextResponse.json(
-        { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
+        { success: false, error: 'Invalid email address format.' },
         { status: 400 }
       );
     }
 
-    // Rate Limiting check (max 5 requests per hour)
-    // We can query database for tokens generated in the last hour
+    // Rate Limiting check (max 5 requests per hour per email/IP)
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
       const { neon } = require('@neondatabase/serverless');
       const sql = neon(databaseUrl);
       const recentTokens = await sql`
         SELECT created_at FROM password_reset_tokens 
-        WHERE phone = ${phone} AND created_at > NOW() - INTERVAL '1 hour'
+        WHERE email = ${email} AND created_at > NOW() - INTERVAL '1 hour'
         ORDER BY created_at DESC
       `;
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     // Retrieve member
-    const member = await db.getMemberByPhone(phone);
+    const member = await db.getMemberByEmail(email);
     if (!member) {
       // Return generic success to prevent user enumeration
       return NextResponse.json({
@@ -56,28 +56,44 @@ export async function POST(request: Request) {
       });
     }
 
+    // Check cooldown on existing token if any
+    const existingToken = await db.getPasswordResetToken(email);
+    if (existingToken) {
+      const timeSinceLastSent = Date.now() - new Date(existingToken.last_sent_at).getTime();
+      if (timeSinceLastSent < 60 * 1000) {
+        const waitSeconds = Math.ceil((60 * 1000 - timeSinceLastSent) / 1000);
+        return NextResponse.json(
+          { success: false, error: `Please wait ${waitSeconds} seconds before requesting another code.` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Generate secure 6-digit OTP
-    const array = new Uint32Array(1);
-    crypto.getRandomValues(array);
-    const otp = String(100000 + (array[0] % 900000));
+    const crypto = require('crypto');
+    let otpVal: number;
+    try {
+      otpVal = crypto.randomInt(100000, 999999);
+    } catch {
+      const array = new Uint32Array(1);
+      crypto.getRandomValues(array);
+      otpVal = 100000 + (array[0] % 900000);
+    }
+    const otp = String(otpVal);
 
     const hashedOtp = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes expiry
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes expiry
 
     await db.createPasswordResetToken({
       member_id: member.member_id,
-      phone,
+      phone: member.phone,
+      email: member.email,
       otp_hash: hashedOtp,
       expires_at: expiresAt
     });
 
-    // In development mode, print OTP to console
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DEVELOPER OTP Recovery Mode] OTP for member ${member.member_id} (${phone}): ${otp}`);
-    } else {
-      // Production fallback - print to log for testing or simulated SMS
-      console.log(`[PRODUCTION OTP MOCK SEND] OTP generated for member ${member.member_id}: ${otp}`);
-    }
+    // Send OTP email via SMTP
+    await sendOtpEmail(email, otp);
 
     // Delete expired tokens automatically to clean up database
     await db.deleteExpiredResetTokens().catch(() => {});

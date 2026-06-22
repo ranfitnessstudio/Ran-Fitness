@@ -8,16 +8,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ran_fitness_super_secure_jwt_secre
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { phone, otp } = body;
+    const { email, otp } = body;
 
-    if (!phone || !otp) {
+    if (!email || !otp) {
       return NextResponse.json(
-        { success: false, error: 'Phone number and OTP are required.' },
+        { success: false, error: 'Email and OTP are required.' },
         { status: 400 }
       );
     }
 
-    const token = await db.getPasswordResetToken(phone);
+    const token = await db.getPasswordResetToken(email);
     if (!token) {
       return NextResponse.json(
         { success: false, error: 'OTP has expired or is invalid.' },

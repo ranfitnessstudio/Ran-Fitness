@@ -923,6 +923,12 @@ async function ensureDbInitialized() {
     await sql`CREATE INDEX IF NOT EXISTS idx_pwd_reset_phone ON password_reset_tokens(phone)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_pwd_reset_expires_at ON password_reset_tokens(expires_at)`;
 
+    // Add email and resend columns if not exist
+    await sql`ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS email TEXT`;
+    await sql`ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS resend_count INT DEFAULT 0`;
+    await sql`ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS last_sent_at TIMESTAMPTZ DEFAULT NOW()`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_pwd_reset_email ON password_reset_tokens(email)`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS password_reset_audit (
         id SERIAL PRIMARY KEY,
@@ -3610,7 +3616,7 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     return false;
   },
 
-  async createPasswordResetToken(data: { member_id: string; phone: string; otp_hash: string; expires_at: string }): Promise<any> {
+  async createPasswordResetToken(data: { member_id: string; phone: string; email?: string; otp_hash: string; expires_at: string }): Promise<any> {
     if (typeof window !== 'undefined') {
       return await clientProxy<any>('createPasswordResetToken', [data]);
     }
@@ -3618,10 +3624,14 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
       // Invalidate existing active tokens
-      await sql`UPDATE password_reset_tokens SET used = TRUE WHERE phone = ${data.phone}`;
+      if (data.email) {
+        await sql`UPDATE password_reset_tokens SET used = TRUE WHERE email = ${data.email} OR phone = ${data.phone}`;
+      } else {
+        await sql`UPDATE password_reset_tokens SET used = TRUE WHERE phone = ${data.phone}`;
+      }
       const rows = await sql`
-        INSERT INTO password_reset_tokens (member_id, phone, otp_hash, expires_at)
-        VALUES (${data.member_id}, ${data.phone}, ${data.otp_hash}, ${data.expires_at})
+        INSERT INTO password_reset_tokens (member_id, phone, email, otp_hash, expires_at, resend_count, last_sent_at)
+        VALUES (${data.member_id}, ${data.phone}, ${data.email || null}, ${data.otp_hash}, ${data.expires_at}, 0, NOW())
         RETURNING *
       `;
       return rows[0];
@@ -3629,19 +3639,41 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     return null;
   },
 
-  async getPasswordResetToken(phone: string): Promise<any> {
+  async getPasswordResetToken(identifier: string): Promise<any> {
     if (typeof window !== 'undefined') {
-      return await clientProxy<any>('getPasswordResetToken', [phone]);
+      return await clientProxy<any>('getPasswordResetToken', [identifier]);
     }
     if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
       const rows = await sql`
         SELECT * FROM password_reset_tokens 
-        WHERE phone = ${phone} AND used = FALSE AND expires_at > NOW() 
+        WHERE (phone = ${identifier} OR email = ${identifier}) AND used = FALSE AND expires_at > NOW() 
         ORDER BY created_at DESC LIMIT 1
       `;
       return rows[0] || null;
+    }
+    return null;
+  },
+
+  async incrementResetTokenResends(id: number, otpHash: string, expiresAt: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('incrementResetTokenResends', [id, otpHash, expiresAt]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE password_reset_tokens 
+        SET resend_count = resend_count + 1, 
+            last_sent_at = NOW(), 
+            otp_hash = ${otpHash}, 
+            expires_at = ${expiresAt}, 
+            attempts = 0 
+        WHERE id = ${id} 
+        RETURNING *
+      `;
+      return rows[0];
     }
     return null;
   },
@@ -3845,7 +3877,7 @@ async autoUpdateMembershipStatuses(): Promise<void> {
     return null;
   },
 
-  async createMemberWithOtp(data: { name: string; email: string; phone: string }): Promise<any> {
+  async createMemberWithOtp(data: { name: string; email: string; phone: string; password_hash?: string }): Promise<any> {
     if (typeof window !== 'undefined') {
       return await clientProxy<any>('createMemberWithOtp', [data]);
     }
@@ -3854,8 +3886,8 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       const sql = neon(databaseUrl);
       const memberId = 'RF_MB_' + Math.floor(100000 + Math.random() * 900000);
       const rows = await sql`
-        INSERT INTO members (member_id, name, email, phone, membership_type, start_date, end_date, status, email_verified)
-        VALUES (${memberId}, ${data.name}, ${data.email}, ${data.phone}, 'Basic Strength & Cardio', TO_CHAR(NOW(), 'YYYY-MM-DD'), TO_CHAR(NOW() + INTERVAL '1 month', 'YYYY-MM-DD'), 'Active', TRUE)
+        INSERT INTO members (member_id, name, email, phone, password_hash, membership_type, start_date, end_date, status, email_verified)
+        VALUES (${memberId}, ${data.name}, ${data.email}, ${data.phone}, ${data.password_hash || null}, 'Basic Strength & Cardio', TO_CHAR(NOW(), 'YYYY-MM-DD'), TO_CHAR(NOW() + INTERVAL '1 month', 'YYYY-MM-DD'), 'Active', TRUE)
         RETURNING *
       `;
       return rows[0];
