@@ -21,13 +21,17 @@ const updateThemeOnDom = (newTheme: 'light' | 'dark') => {
 };
 
 export const ThemeToggle: React.FC<ThemeToggleProps> = ({ theme: propTheme, onToggle }) => {
-  const [localTheme, setLocalTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') return 'dark';
-    const storedTheme = localStorage.getItem('ran_fitness_color_theme');
-    return (storedTheme === 'light' || storedTheme === 'dark') ? storedTheme : 'dark';
-  });
+  const [localTheme, setLocalTheme] = useState<'light' | 'dark'>('dark');
   
   const activeTheme = propTheme !== undefined ? propTheme : localTheme;
+
+  // Retrieve stored theme from localStorage after mounting
+  useEffect(() => {
+    const storedTheme = localStorage.getItem('ran_fitness_color_theme');
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      setLocalTheme(storedTheme);
+    }
+  }, []);
 
   // Keep DOM in sync with the active theme
   useEffect(() => {

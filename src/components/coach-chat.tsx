@@ -33,14 +33,20 @@ const generateMessageId = (sender: string) => {
 
 export const CoachChat: React.FC<CoachChatProps> = ({ onOpenBooking }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      sender: 'coach',
-      text: "WHAT'S UP! I'm your Ran Fitness AI Sales Coach. Ready to crush your goals? Ask me about our Aerofit equipment, pricing plans, Zumba schedules, or CrossFit training. Ready to get started? Tell me your fitness goals!",
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setMessages([
+      {
+        id: 'welcome',
+        sender: 'coach',
+        text: "WHAT'S UP! I'm your Ran Fitness AI Sales Coach. Ready to crush your goals? Ask me about our Aerofit equipment, pricing plans, Zumba schedules, or CrossFit training. Ready to get started? Tell me your fitness goals!",
+        timestamp: new Date()
+      }
+    ]);
+  }, []);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);

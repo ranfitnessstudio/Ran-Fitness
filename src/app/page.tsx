@@ -2488,7 +2488,7 @@ export default function Home() {
                     RAN Fitness is Street 8 Habsiguda's premier hybrid conditioning, zumba, and heavy bodybuilding studio. Fully equipped with commercial Aerofit workstations.
                   </p>
                   <p className="text-zinc-400 dark:text-zinc-700 text-[10px]">
-                    © {new Date().getFullYear()} RAN Fitness. All Rights Reserved.
+                    © 2026 RAN Fitness. All Rights Reserved.
                   </p>
                 </div>
 
