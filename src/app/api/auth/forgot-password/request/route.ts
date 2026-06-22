@@ -47,8 +47,10 @@ export async function POST(request: Request) {
     }
 
     // Retrieve member
+    console.log(`[PASSWORD-REQUEST-AUDIT] Looking up member by email: ${email}`);
     const member = await db.getMemberByEmail(email);
     if (!member) {
+      console.log(`[PASSWORD-REQUEST-AUDIT] Member not found for email: ${email}. Returning generic success.`);
       // Return generic success to prevent user enumeration
       return NextResponse.json({
         success: true,
@@ -56,12 +58,16 @@ export async function POST(request: Request) {
       });
     }
 
+    console.log(`[PASSWORD-REQUEST-AUDIT] Member found. ID: ${member.member_id}, Name: ${member.name}, Phone: ${member.phone}`);
+
     // Check cooldown on existing token if any
     const existingToken = await db.getPasswordResetToken(email);
     if (existingToken) {
+      console.log(`[PASSWORD-REQUEST-AUDIT] Active token already exists (resends: ${existingToken.resend_count}, last sent: ${existingToken.last_sent_at})`);
       const timeSinceLastSent = Date.now() - new Date(existingToken.last_sent_at).getTime();
       if (timeSinceLastSent < 60 * 1000) {
         const waitSeconds = Math.ceil((60 * 1000 - timeSinceLastSent) / 1000);
+        console.log(`[PASSWORD-REQUEST-AUDIT] Cooldown block. Wait: ${waitSeconds}s`);
         return NextResponse.json(
           { success: false, error: `Please wait ${waitSeconds} seconds before requesting another code.` },
           { status: 400 }

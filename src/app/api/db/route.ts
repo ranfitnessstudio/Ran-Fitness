@@ -40,6 +40,7 @@ const PUBLIC_ACTIONS = new Set([
   'deleteProgressPhoto',
   'createPasswordResetToken',
   'getPasswordResetToken',
+  'incrementResetTokenResends',
   'incrementResetTokenAttempts',
   'markResetTokenUsed',
   'deleteExpiredResetTokens',
@@ -53,6 +54,7 @@ const PUBLIC_ACTIONS = new Set([
   'markOtpUsed',
   'cleanExpiredOtps',
   'getMemberByEmail',
+  'getMemberByPhone',
   'createMemberWithOtp'
 ]);
 

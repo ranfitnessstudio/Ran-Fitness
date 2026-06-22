@@ -110,10 +110,16 @@ export async function POST(request: Request) {
     }
 
     // Hash and update the password
+    console.log(`[PASSWORD-RESET-AUDIT] Hashing password for memberId: ${memberId}`);
     const hashed = await bcrypt.hash(password, 10);
+    console.log(`[PASSWORD-RESET-AUDIT] Hash generated: ${hashed}`);
+
+    console.log(`[PASSWORD-RESET-AUDIT] Executing updateMemberPassword...`);
     const updated = await db.updateMemberPassword(memberId, hashed, false);
+    console.log(`[PASSWORD-RESET-AUDIT] updateMemberPassword result: ${updated}`);
 
     if (!updated) {
+      console.log(`[PASSWORD-RESET-AUDIT] Database update failed for memberId: ${memberId}`);
       return NextResponse.json(
         { success: false, error: 'Failed to save updated password.' },
         { status: 500 }
