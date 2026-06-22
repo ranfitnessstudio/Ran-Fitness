@@ -70,14 +70,16 @@ export async function hashSha256(input: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function generateMemberSessionCookieValue(memberId: string, passwordHash: string): Promise<string> {
-  const sig = await hashSha256(passwordHash);
+export async function generateMemberSessionCookieValue(memberId: string, passwordHash?: string): Promise<string> {
+  const tokenInput = passwordHash ? passwordHash : (memberId + JWT_SECRET);
+  const sig = await hashSha256(tokenInput);
   return `${memberId}.${sig}`;
 }
 
-export async function verifyMemberSessionCookie(cookieValue: string, passwordHash: string): Promise<boolean> {
+export async function verifyMemberSessionCookie(cookieValue: string, passwordHash?: string): Promise<boolean> {
   const parts = cookieValue.split('.');
   if (parts.length !== 2) return false;
-  const sig = await hashSha256(passwordHash || '');
+  const tokenInput = passwordHash ? passwordHash : (parts[0] + JWT_SECRET);
+  const sig = await hashSha256(tokenInput);
   return parts[1] === sig;
 }

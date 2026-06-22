@@ -934,6 +934,31 @@ async function ensureDbInitialized() {
     `;
 
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS force_reset BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`;
+    try {
+      await sql`ALTER TABLE members ADD CONSTRAINT members_email_key UNIQUE (email)`;
+    } catch (e) {}
+    try {
+      await sql`ALTER TABLE members ADD CONSTRAINT members_phone_key UNIQUE (phone)`;
+    } catch (e) {}
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS otp (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT,
+        email TEXT NOT NULL,
+        otp_hash TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        attempts INT DEFAULT 0,
+        resend_count INT DEFAULT 0,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        last_sent_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_otp_email_purpose ON otp(email, purpose)`;
+
 
     await sql`
       CREATE TABLE IF NOT EXISTS admin_credentials (
@@ -3702,5 +3727,140 @@ async autoUpdateMembershipStatuses(): Promise<void> {
       return rows;
     }
     return [];
+  },
+
+  async createOtpEntry(data: { member_id?: string; email: string; otp_hash: string; purpose: string; expires_at: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('createOtpEntry', [data]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      await sql`UPDATE otp SET used = TRUE WHERE email = ${data.email} AND purpose = ${data.purpose}`;
+      const rows = await sql`
+        INSERT INTO otp (member_id, email, otp_hash, purpose, expires_at, attempts, resend_count, last_sent_at)
+        VALUES (${data.member_id || null}, ${data.email}, ${data.otp_hash}, ${data.purpose}, ${data.expires_at}, 0, 0, NOW())
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async getOtpEntry(email: string, purpose: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('getOtpEntry', [email, purpose]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        SELECT * FROM otp 
+        WHERE email = ${email} AND purpose = ${purpose} AND used = FALSE
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async incrementOtpAttempts(id: number): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('incrementOtpAttempts', [id]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE otp 
+        SET attempts = attempts + 1 
+        WHERE id = ${id} 
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async incrementOtpResends(id: number): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('incrementOtpResends', [id]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE otp 
+        SET resend_count = resend_count + 1, last_sent_at = NOW() 
+        WHERE id = ${id} 
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async markOtpUsed(id: number): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('markOtpUsed', [id]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE otp 
+        SET used = TRUE 
+        WHERE id = ${id} 
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
+  },
+
+  async cleanExpiredOtps(): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<boolean>('cleanExpiredOtps') || false;
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      await sql`DELETE FROM otp WHERE expires_at <= NOW() OR used = TRUE`;
+      return true;
+    }
+    return false;
+  },
+
+  async getMemberByEmail(email: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('getMemberByEmail', [email]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`SELECT * FROM members WHERE email = ${email} LIMIT 1`;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async createMemberWithOtp(data: { name: string; email: string; phone: string }): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('createMemberWithOtp', [data]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const memberId = 'RF_MB_' + Math.floor(100000 + Math.random() * 900000);
+      const rows = await sql`
+        INSERT INTO members (member_id, name, email, phone, membership_type, start_date, end_date, status, email_verified)
+        VALUES (${memberId}, ${data.name}, ${data.email}, ${data.phone}, 'Basic Strength & Cardio', TO_CHAR(NOW(), 'YYYY-MM-DD'), TO_CHAR(NOW() + INTERVAL '1 month', 'YYYY-MM-DD'), 'Active', TRUE)
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    return null;
   }
 };
+

@@ -45,7 +45,15 @@ const PUBLIC_ACTIONS = new Set([
   'deleteExpiredResetTokens',
   'savePasswordResetAudit',
   'getPasswordResetAudits',
-  'updateMemberPassword'
+  'updateMemberPassword',
+  'createOtpEntry',
+  'getOtpEntry',
+  'incrementOtpAttempts',
+  'incrementOtpResends',
+  'markOtpUsed',
+  'cleanExpiredOtps',
+  'getMemberByEmail',
+  'createMemberWithOtp'
 ]);
 
 export async function POST(request: Request) {

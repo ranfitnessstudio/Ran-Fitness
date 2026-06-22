@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Phone, Eye, EyeOff, ShieldAlert, Sparkles, Key, CheckCircle, RefreshCw } from 'lucide-react';
+import { X, Lock, Mail, Phone, ShieldAlert, Sparkles, Key, CheckCircle, RefreshCw, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface MemberLoginModalProps {
@@ -11,42 +11,43 @@ interface MemberLoginModalProps {
 }
 
 export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onClose }) => {
-  const [mode, setMode] = useState<'login' | 'activate' | 'forgot'>('login');
-  const [forgotStep, setForgotStep] = useState<1 | 2 | 3 | 4>(1);
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [loginTab, setLoginTab] = useState<'email' | 'phone'>('email');
+  
+  // Recovery / Verification Steps
+  // 1: Input details (email/phone/registration)
+  // 2: Enter OTP Code
+  // 3: Success Setup
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [memberId, setMemberId] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [resetToken, setResetToken] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Timers
+  const [expiryTimer, setExpiryTimer] = useState(0);
   const [resendTimer, setResendTimer] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState(5);
+
   const router = useRouter();
 
-  // Password Policy Live Validation State
-  const [passValidations, setPassValidations] = useState({
-    minLength: false,
-    hasUpper: false,
-    hasLower: false,
-    hasNumber: false,
-    hasSpecial: false
-  });
-
-  // Calculate live validations
+  // Expiry Timer Ticker
   useEffect(() => {
-    setPassValidations({
-      minLength: password.length >= 8,
-      hasUpper: /[A-Z]/.test(password),
-      hasLower: /[a-z]/.test(password),
-      hasNumber: /[0-9]/.test(password),
-      hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    });
-  }, [password]);
+    let interval: NodeJS.Timeout;
+    if (expiryTimer > 0) {
+      interval = setInterval(() => {
+        setExpiryTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [expiryTimer]);
 
-  // Countdown timer for OTP resend
+  // Resend Cooldown Timer Ticker
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (resendTimer > 0) {
@@ -57,31 +58,95 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const handleRequestOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Format time (seconds -> MM:SS)
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setSuccess('');
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('/api/auth/forgot-password/request', {
+      const isRegister = mode === 'register';
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/send-otp';
+      
+      const payload: any = {};
+      if (isRegister) {
+        payload.name = fullName;
+        payload.email = email;
+        payload.phone = phone;
+      } else {
+        payload.purpose = 'LOGIN';
+        if (loginTab === 'email') {
+          payload.email = email;
+        } else {
+          payload.phone = phone;
+        }
+      }
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(payload)
       });
+
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setError(data.error || 'Request failed. Please try again.');
+        setError(data.error || 'Failed to dispatch OTP. Please try again.');
         setIsSubmitting(false);
         return;
       }
-      setSuccess('OTP verification code has been sent!');
-      setResendTimer(60);
+
+      // If phone login, capture registered email resolved by backend
+      if (!isRegister && loginTab === 'phone') {
+        setEmail(data.email);
+      }
+
+      setSuccess('Verification OTP code dispatched!');
+      setExpiryTimer(300); // 5 minutes
+      setResendTimer(60);  // 60s cooldown
+      setAttemptsRemaining(5);
+
       setTimeout(() => {
         setSuccess('');
-        setForgotStep(2);
+        setStep(2);
         setIsSubmitting(false);
       }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError('');
+    setSuccess('');
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, purpose: mode === 'register' ? 'REGISTER' : 'LOGIN' })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Resend failed.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setSuccess('A new verification code has been dispatched.');
+      setExpiryTimer(300); // Reset to 5 mins
+      setResendTimer(60);  // Reset resend cooldown
+      setOtpCode('');
+      setIsSubmitting(false);
     } catch (err: any) {
       setError(err.message || 'An error occurred.');
       setIsSubmitting(false);
@@ -95,157 +160,69 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('/api/auth/forgot-password/verify', {
+      const payload: any = {
+        email,
+        otp: otpCode,
+        purpose: mode === 'register' ? 'REGISTER' : 'LOGIN'
+      };
+
+      if (mode === 'register') {
+        payload.registrationData = {
+          name: fullName,
+          phone
+        };
+      }
+
+      const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp: otpCode }),
+        body: JSON.stringify(payload)
       });
+
       const data = await res.json();
       if (!res.ok || !data.success) {
         setError(data.error || 'Verification failed.');
-        setIsSubmitting(false);
-        return;
-      }
-      setResetToken(data.resetToken);
-      setSuccess('OTP verified successfully!');
-      setTimeout(() => {
-        setSuccess('');
-        setForgotStep(3);
-        setIsSubmitting(false);
-      }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred.');
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsSubmitting(true);
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    const isComplex = Object.values(passValidations).every(Boolean);
-    if (!isComplex) {
-      setError('Password does not meet complexity requirements.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/auth/forgot-password/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resetToken, password, confirmPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Reset failed.');
-        setIsSubmitting(false);
-        return;
-      }
-      setSuccess('Password updated successfully!');
-      setTimeout(() => {
-        setSuccess('');
-        setForgotStep(4);
-        setIsSubmitting(false);
-      }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred.');
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleLoginOrActivate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsSubmitting(true);
-
-    if (mode === 'activate' && password !== confirmPassword) {
-      setError('Passwords do not match.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const endpoint = mode === 'login' ? '/api/auth/member-login' : '/api/auth/member-activate';
-      const payload = mode === 'login' 
-        ? { phone, password } 
-        : { phone, member_id: memberId, password };
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Authentication failed. Please try again.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (mode === 'activate') {
-        setSuccess('Account activated successfully! Logging you in...');
-        setTimeout(async () => {
-          try {
-            const loginRes = await fetch('/api/auth/member-login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone, password }),
-            });
-            const loginData = await loginRes.json();
-            if (loginRes.ok && loginData.success) {
-              onClose();
-              router.push('/member-dashboard');
-              router.refresh();
-            } else {
-              setMode('login');
-              setSuccess('');
-              setError('Account activated. Please enter password to log in.');
-              setIsSubmitting(false);
-            }
-          } catch {
-            setMode('login');
-            setSuccess('');
-            setIsSubmitting(false);
+        // Parse attempts left from standard error structure
+        if (data.error && data.error.includes('attempts remaining')) {
+          const match = data.error.match(/(\d+) attempts/);
+          if (match) {
+            setAttemptsRemaining(parseInt(match[1]));
           }
-        }, 1500);
-      } else {
-        onClose();
-        router.push('/member-dashboard');
-        router.refresh();
+        } else if (data.error && data.error.includes('invalidated')) {
+          setAttemptsRemaining(0);
+        }
+        setIsSubmitting(false);
+        return;
       }
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'A network error occurred. Please try again.';
-      setError(errMsg);
+
+      setSuccess(mode === 'register' ? 'Account created successfully!' : 'Verification successful!');
+      setTimeout(() => {
+        setSuccess('');
+        setStep(3);
+        setIsSubmitting(false);
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.');
       setIsSubmitting(false);
     }
   };
 
-  const toggleMode = () => {
-    setMode(mode === 'login' ? 'activate' : 'login');
-    setForgotStep(1);
+  const handleSuccessRedirect = () => {
+    onClose();
+    router.push('/member-dashboard');
+    router.refresh();
+  };
+
+  const handleBackToLogin = () => {
+    setMode('login');
+    setStep(1);
     setError('');
     setSuccess('');
+    setEmail('');
     setPhone('');
-    setMemberId('');
-    setPassword('');
-    setConfirmPassword('');
+    setFullName('');
     setOtpCode('');
   };
-
-  const activePoints = Object.values(passValidations).filter(Boolean).length;
-  const strengthColor = activePoints <= 2 ? 'bg-red-500' : activePoints <= 4 ? 'bg-yellow-500' : 'bg-green-500';
 
   return (
     <AnimatePresence>
@@ -281,50 +258,39 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
             {/* Step-by-Step Title & Icons */}
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <div className="rounded-full bg-yellow-400 p-3 text-black">
-                {mode === 'login' ? (
-                  <Lock size={22} />
-                ) : mode === 'activate' ? (
-                  <Sparkles size={22} />
-                ) : forgotStep === 4 ? (
+                {step === 3 ? (
                   <CheckCircle size={22} />
-                ) : (
+                ) : step === 2 ? (
                   <Key size={22} />
+                ) : mode === 'register' ? (
+                  <Sparkles size={22} />
+                ) : (
+                  <Lock size={22} />
                 )}
               </div>
               <div>
                 <h3 className="font-display text-lg font-black italic tracking-widest text-white uppercase">
-                  {mode === 'login' 
-                    ? 'MEMBER LOGIN' 
-                    : mode === 'activate' 
-                      ? 'ACTIVATE ACCOUNT' 
-                      : forgotStep === 1 
-                        ? 'FORGOT PASSWORD' 
-                        : forgotStep === 2 
-                          ? 'VERIFY OTP' 
-                          : forgotStep === 3 
-                            ? 'RESET PASSWORD' 
-                            : 'PASSWORD RESET SUCCESSFUL'
+                  {step === 3 
+                    ? 'WELCOME TO RAN FITNESS' 
+                    : step === 2 
+                      ? 'VERIFY OTP' 
+                      : mode === 'register' 
+                        ? 'CREATE ACCOUNT' 
+                        : 'MEMBER LOGIN'
                   }
                 </h3>
                 <p className="text-zinc-500 text-xs mt-1 uppercase tracking-wider font-mono">
-                  {mode === 'login' 
-                    ? 'Access your fitness portal' 
-                    : mode === 'activate' 
-                      ? 'First-time activation setup' 
-                      : forgotStep === 4 
-                        ? 'Setup complete' 
-                        : `Recovery Stage ${forgotStep} of 3`
+                  {step === 3 
+                    ? 'Account Setup Complete' 
+                    : step === 2 
+                      ? 'Verification step' 
+                      : mode === 'register' 
+                        ? 'Register a new membership' 
+                        : 'Access your portal'
                   }
                 </p>
               </div>
             </div>
-
-            {/* Info description for steps */}
-            {mode === 'forgot' && forgotStep === 1 && (
-              <p className="text-xs text-zinc-400 text-center mt-3 font-medium">
-                Enter your registered phone number.
-              </p>
-            )}
 
             {/* Error and Success Banners */}
             <div className="mt-4 empty:hidden">
@@ -343,324 +309,218 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
               )}
             </div>
 
-            {/* Dynamic Step Forms */}
-            {mode === 'forgot' ? (
-              <div className="mt-4">
-                {/* Step 1: Phone verification */}
-                {forgotStep === 1 && (
-                  <form onSubmit={handleRequestOtp} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
-                        <Phone size={10} /> Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="e.g. 9876543210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-650"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
-                    >
-                      {isSubmitting ? 'Sending...' : 'Send OTP'}
-                    </button>
-                  </form>
-                )}
-
-                {/* Step 2: OTP Validation */}
-                {forgotStep === 2 && (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                        6-digit OTP
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        placeholder="e.g. 123456"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        className="w-full text-center tracking-widest font-mono text-base rounded-lg border border-zinc-800 bg-zinc-900 py-3.5 text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-650"
-                      />
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs font-mono px-1">
-                      <span className="text-zinc-500">
-                        {resendTimer > 0 ? `Code expires in ${resendTimer}s` : 'Code expired'}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={resendTimer > 0}
-                        onClick={() => handleRequestOtp()}
-                        className="text-yellow-400 hover:text-yellow-300 font-bold disabled:text-zinc-600 disabled:no-underline hover:underline transition-colors"
-                      >
-                        Resend OTP
-                      </button>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
-                    >
-                      {isSubmitting ? 'Verifying...' : 'Verify OTP'}
-                    </button>
-                  </form>
-                )}
-
-                {/* Step 3: Password Update Form */}
-                {forgotStep === 3 && (
-                  <form onSubmit={handleResetPassword} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          required
-                          placeholder="••••••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-3.5 pr-10 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-600"
-                        />
+            {/* Step Content */}
+            <div className="mt-5">
+              {/* STEP 1: LOGIN DETAILS INPUT */}
+              {step === 1 && (
+                <>
+                  {mode === 'login' ? (
+                    <div className="space-y-4">
+                      {/* Tabs selector */}
+                      <div className="grid grid-cols-2 gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800 text-xs font-bold uppercase tracking-wider font-mono">
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-350"
+                          onClick={() => { setLoginTab('email'); setError(''); }}
+                          className={`py-2 rounded-md transition-all duration-200 ${loginTab === 'email' ? 'bg-yellow-400 text-black' : 'text-zinc-400 hover:text-white'}`}
                         >
-                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          Continue with Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setLoginTab('phone'); setError(''); }}
+                          className={`py-2 rounded-md transition-all duration-200 ${loginTab === 'phone' ? 'bg-yellow-400 text-black' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                          Continue with Phone
                         </button>
                       </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                        Confirm Password
-                      </label>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        placeholder="••••••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-600"
-                      />
-                    </div>
+                      <form onSubmit={handleSendOtp} className="space-y-4">
+                        {loginTab === 'email' ? (
+                          <div className="space-y-1.5 animate-in fade-in duration-150">
+                            <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
+                              <Mail size={10} /> Email Address
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              placeholder="name@example.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-600"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 animate-in fade-in duration-150">
+                            <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
+                              <Phone size={10} /> Phone Number
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              placeholder="e.g. 9876543210"
+                              value={phone}
+                              onChange={(e) => setPhone(e.target.value)}
+                              className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-600"
+                            />
+                          </div>
+                        )}
 
-                    {/* Password Strength Meter */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-400 font-bold px-0.5">
-                        <span>Strength</span>
-                        <span>{activePoints === 0 ? 'Empty' : activePoints <= 2 ? 'Weak' : activePoints <= 4 ? 'Medium' : 'Strong'}</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
-                        <div 
-                          className={`h-full transition-all duration-300 ${strengthColor}`} 
-                          style={{ width: `${(activePoints / 5) * 100}%` }}
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
+                        >
+                          {isSubmitting ? 'Processing...' : 'Send OTP'}
+                        </button>
+                      </form>
+                    </div>
+                  ) : (
+                    /* Registration form view */
+                    <form onSubmit={handleSendOtp} className="space-y-4 animate-in fade-in duration-150">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
+                          <User size={10} /> Full Name
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Your full name"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none"
                         />
                       </div>
-                    </div>
 
-                    {/* Password Rules Checklist */}
-                    <div className="rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 text-[10px] space-y-1 text-zinc-400">
-                      <div className="font-bold uppercase tracking-wider text-[8px] mb-1.5 text-zinc-500">Complexity requirements:</div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={passValidations.minLength ? 'text-green-400 font-bold' : 'text-red-400'}>
-                          {passValidations.minLength ? '✓' : '✗'}
-                        </span>
-                        <span>Min 8 characters</span>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
+                          <Mail size={10} /> Email Address
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="name@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none"
+                        />
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={passValidations.hasUpper ? 'text-green-400 font-bold' : 'text-red-400'}>
-                          {passValidations.hasUpper ? '✓' : '✗'}
-                        </span>
-                        <span>Uppercase letter</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={passValidations.hasLower ? 'text-green-400 font-bold' : 'text-red-400'}>
-                          {passValidations.hasLower ? '✓' : '✗'}
-                        </span>
-                        <span>Lowercase letter</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={passValidations.hasNumber ? 'text-green-400 font-bold' : 'text-red-400'}>
-                          {passValidations.hasNumber ? '✓' : '✗'}
-                        </span>
-                        <span>At least one number</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={passValidations.hasSpecial ? 'text-green-400 font-bold' : 'text-red-400'}>
-                          {passValidations.hasSpecial ? '✓' : '✗'}
-                        </span>
-                        <span>Special character (!@#$%^&*)</span>
-                      </div>
-                    </div>
 
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
-                    >
-                      {isSubmitting ? 'Updating...' : 'Reset Password'}
-                    </button>
-                  </form>
-                )}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
+                          <Phone size={10} /> Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="e.g. 9876543210"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none"
+                        />
+                      </div>
 
-                {/* Step 4: Success Screen */}
-                {forgotStep === 4 && (
-                  <div className="space-y-4 mt-2">
-                    <p className="text-sm text-zinc-300 text-center font-medium leading-relaxed">
-                      Your password has been updated successfully.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setMode('login');
-                        setForgotStep(1);
-                        setError('');
-                        setSuccess('');
-                        setPhone('');
-                        setPassword('');
-                        setConfirmPassword('');
-                        setOtpCode('');
-                      }}
-                      className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 transition-colors"
-                    >
-                      Back to Login
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <form onSubmit={handleLoginOrActivate} className="mt-6 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
-                    <Phone size={10} /> Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. 9876543210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-600"
-                  />
-                </div>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
+                      >
+                        {isSubmitting ? 'Sending...' : 'Create Account'}
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
 
-                {mode === 'activate' && (
+              {/* STEP 2: OTP VERIFICATION WIZARD */}
+              {step === 2 && (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
-                      <Sparkles size={10} /> Member ID (from receipt)
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
+                      Enter 6-digit OTP code sent to registered email
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. RF1001"
-                      value={memberId}
-                      onChange={(e) => setMemberId(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-650"
+                      maxLength={6}
+                      placeholder="e.g. 123456"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      className="w-full text-center tracking-widest font-mono text-base rounded-lg border border-zinc-800 bg-zinc-900 py-3.5 text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-650"
                     />
                   </div>
-                )}
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex justify-between">
-                    <span>{mode === 'login' ? 'Password' : 'Create Password'}</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="••••••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-3.5 pr-10 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-                    >
-                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-
-                  {/* Forgot Password Link directly below password input, aligned right */}
-                  {mode === 'login' && (
-                    <div className="flex justify-end mt-1.5">
+                  <div className="flex justify-between items-center text-xs font-mono px-1">
+                    <span className="text-zinc-500">
+                      Code expires: <span className="font-bold text-zinc-350">{formatTime(expiryTimer)}</span>
+                    </span>
+                    {resendTimer > 0 ? (
+                      <span className="text-zinc-500 italic">Resend in {resendTimer}s</span>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => {
-                          setMode('forgot');
-                          setForgotStep(1);
-                          setError('');
-                          setSuccess('');
-                        }}
-                        className="text-[10px] font-bold text-yellow-400 hover:text-yellow-300 transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-yellow-400 rounded px-1"
+                        onClick={handleResendOtp}
+                        className="text-yellow-400 hover:text-yellow-300 font-bold hover:underline transition-colors"
                       >
-                        Forgot Password?
+                        Resend OTP
                       </button>
-                    </div>
-                  )}
-                </div>
-
-                {mode === 'activate' && (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                      Confirm Password
-                    </label>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="••••••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-650"
-                    />
+                    )}
                   </div>
-                )}
 
-                {/* Submit Action */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="mt-2 w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
-                >
-                  {isSubmitting 
-                    ? 'Processing...' 
-                    : mode === 'login' ? 'ACCESS DASHBOARD' : 'ACTIVATE & LOGIN'
-                  }
-                </button>
-              </form>
-            )}
+                  <div className="text-[10px] text-zinc-500 font-mono text-center pt-1 flex items-center justify-center gap-1">
+                    Attempts remaining: <strong className={attemptsRemaining <= 2 ? 'text-red-500' : 'text-zinc-300'}>{attemptsRemaining}</strong>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || expiryTimer <= 0 || attemptsRemaining <= 0}
+                    className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
+                  >
+                    {isSubmitting ? 'Verifying...' : 'Verify OTP'}
+                  </button>
+                </form>
+              )}
+
+              {/* STEP 3: SUCCESS WELCOME SCREEN */}
+              {step === 3 && (
+                <div className="space-y-4 text-center mt-2">
+                  <p className="text-sm text-zinc-300 font-medium leading-relaxed">
+                    {mode === 'register' 
+                      ? 'Your account setup has completed successfully and email is verified.'
+                      : 'Verification successful! You are now logged in.'
+                    }
+                  </p>
+                  <button
+                    onClick={handleSuccessRedirect}
+                    className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 transition-colors"
+                  >
+                    ACCESS DASHBOARD
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Toggle Modes Footer */}
             <div className="mt-6 text-center space-y-2 border-t border-zinc-900 pt-4">
-              {mode === 'forgot' ? (
+              {step === 2 && (
                 <button
-                  onClick={() => {
-                    setMode('login');
-                    setForgotStep(1);
-                    setError('');
-                    setSuccess('');
-                    setPhone('');
-                    setPassword('');
-                    setConfirmPassword('');
-                    setOtpCode('');
-                  }}
+                  type="button"
+                  onClick={handleBackToLogin}
                   className="text-xs text-yellow-400 font-bold font-sans hover:underline focus:outline-none"
                 >
                   Back to Login
                 </button>
-              ) : (
+              )}
+              {step === 1 && (
                 <button
-                  onClick={toggleMode}
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === 'login' ? 'register' : 'login');
+                    setError('');
+                    setSuccess('');
+                    setEmail('');
+                    setPhone('');
+                    setFullName('');
+                  }}
                   className="text-xs text-yellow-400 font-bold font-sans hover:underline focus:outline-none"
                 >
                   {mode === 'login' 

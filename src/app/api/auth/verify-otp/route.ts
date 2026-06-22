@@ -1,0 +1,136 @@
+import { NextResponse } from 'next/server';
+import { db } from '@/lib/database';
+import bcrypt from 'bcryptjs';
+import { sendWelcomeEmail } from '@/lib/email';
+import { generateMemberSessionCookieValue } from '@/lib/auth-token';
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const { email, otp, purpose, registrationData } = body;
+
+    if (!email || !otp) {
+      return NextResponse.json(
+        { success: false, error: 'Email and OTP are required.' },
+        { status: 400 }
+      );
+    }
+
+    const selectedPurpose = purpose || 'LOGIN';
+
+    // Retrieve active OTP record
+    const otpRecord = await db.getOtpEntry(email, selectedPurpose);
+    if (!otpRecord) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid or expired OTP.' },
+        { status: 400 }
+      );
+    }
+
+    // Expiry check
+    if (new Date(otpRecord.expires_at).getTime() < Date.now()) {
+      return NextResponse.json(
+        { success: false, error: 'OTP has expired.' },
+        { status: 400 }
+      );
+    }
+
+    // Verify OTP code matches stored hash
+    const isOtpValid = await bcrypt.compare(otp, otpRecord.otp_hash);
+
+    if (isOtpValid) {
+      // Mark OTP as used
+      await db.markOtpUsed(otpRecord.id);
+
+      let member: any = null;
+
+      if (selectedPurpose === 'REGISTER') {
+        if (!registrationData || !registrationData.name || !registrationData.phone) {
+          return NextResponse.json(
+            { success: false, error: 'Registration details are missing.' },
+            { status: 400 }
+          );
+        }
+
+        // Check uniqueness constraints before creating member
+        const existingEmail = await db.getMemberByEmail(email);
+        if (existingEmail) {
+          return NextResponse.json(
+            { success: false, error: 'An account with this email already exists.' },
+            { status: 400 }
+          );
+        }
+
+        const existingPhone = await db.getMemberByPhone(registrationData.phone);
+        if (existingPhone) {
+          return NextResponse.json(
+            { success: false, error: 'An account with this phone number already exists.' },
+            { status: 400 }
+          );
+        }
+
+        // Create Member
+        member = await db.createMemberWithOtp({
+          name: registrationData.name,
+          email,
+          phone: registrationData.phone
+        });
+
+        // Dispatch Welcome Email
+        await sendWelcomeEmail(email, registrationData.name);
+      } else {
+        member = await db.getMemberByEmail(email);
+      }
+
+      if (!member) {
+        return NextResponse.json(
+          { success: false, error: 'Member profile could not be retrieved.' },
+          { status: 404 }
+        );
+      }
+
+      // Create authenticated session
+      const cookieValue = await generateMemberSessionCookieValue(member.member_id);
+      
+      const response = NextResponse.json({
+        success: true,
+        message: 'Authenticated successfully',
+        member
+      });
+
+      // Set HttpOnly secure session cookie
+      response.cookies.set('ran_member_session', cookieValue, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 30 * 24 * 60 * 60 // 30 Days
+      });
+
+      return response;
+    } else {
+      // Increment attempts
+      const updatedRecord = await db.incrementOtpAttempts(otpRecord.id);
+      const remaining = 5 - updatedRecord.attempts;
+
+      if (updatedRecord.attempts >= 5) {
+        await db.markOtpUsed(otpRecord.id);
+        return NextResponse.json(
+          { success: false, error: 'OTP invalidated due to too many failed attempts. Please request a new OTP.' },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        { success: false, error: `Invalid OTP. ${remaining} attempts remaining.` },
+        { status: 400 }
+      );
+    }
+  } catch (error: any) {
+    console.error('[VERIFY OTP ERROR]', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to verify code.' },
+      { status: 500 }
+    );
+  }
+}
