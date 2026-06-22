@@ -82,10 +82,17 @@ export async function POST(request: Request) {
     // Delete expired tokens automatically to clean up database
     await db.deleteExpiredResetTokens().catch(() => {});
 
-    return NextResponse.json({
+    const responsePayload: any = {
       success: true,
       message: 'If the account exists, recovery instructions have been sent.'
-    });
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      responsePayload.otp = otp;
+    }
+
+    return NextResponse.json(responsePayload);
+
   } catch (error: any) {
     console.error('[FORGOT PASSWORD REQUEST ERROR]', error);
     return NextResponse.json(
