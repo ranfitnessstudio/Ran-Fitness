@@ -29,7 +29,8 @@ import {
   MessageSquare,
   Video,
   KeyRound,
-  Menu
+  Menu,
+  Eye
 } from 'lucide-react';
 import { db, Trainer, Equipment, MembershipPlan, Transformation, WebsiteSettings, Lead, SocialLinks, GymEvent, CareerApplication, AiMetric, AiProviderStatus, Member, MemberProgress, WorkoutDay, Announcement, Attendance, VirtualTour } from '@/lib/database';
 import { CloudinaryUpload } from '@/components/ui/cloudinary-upload';
@@ -157,6 +158,7 @@ export default function AdminDashboard() {
   
   // Modals for Members
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
+  const [viewingMemberDetails, setViewingMemberDetails] = useState<Member | null>(null);
   const [isAddProgressOpen, setIsAddProgressOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [progressMemberId, setProgressMemberId] = useState<string | null>(null);
@@ -504,6 +506,23 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       showToastMessage(err.message || 'Failed to save member details', 'error');
+    }
+  };
+
+  const handleManualCheckIn = async (memberId: string, memberName: string) => {
+    try {
+      const res = await db.checkInMember(memberId);
+      if (res) {
+        showToastMessage(`✅ Checked in ${memberName} successfully!`);
+        const att = await db.getDailyAttendance(attendanceDate);
+        setAttendanceLogs(att || []);
+        const allAtt = await db.getAllAttendance().catch(() => []);
+        setAllAttendanceLogs(allAtt || []);
+      } else {
+        showToastMessage(`❌ ${memberName} is already checked in for today.`, 'error');
+      }
+    } catch (err: any) {
+      showToastMessage(`❌ Check-in failed: ${err.message}`, 'error');
     }
   };
 
@@ -2135,6 +2154,20 @@ ${xmlRows}
                             </td>
                             <td className="py-2.5 text-right space-x-1.5">
                               <button
+                                onClick={() => setViewingMemberDetails(m)}
+                                className="text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                                title="View Member Details"
+                              >
+                                <Eye size={13} className="inline" />
+                              </button>
+                              <button
+                                onClick={() => handleManualCheckIn(m.member_id, m.name)}
+                                className="text-zinc-400 hover:text-green-500 dark:hover:text-green-400 transition-colors"
+                                title="Manual Check In"
+                              >
+                                <CheckCircle size={13} className="inline" />
+                              </button>
+                              <button
                                 onClick={() => {
                                   setEditingMember(m);
                                   setIsAddMemberOpen(true);
@@ -2284,6 +2317,18 @@ ${xmlRows}
                           </div>
 
                           <div className="flex flex-wrap gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-900 text-[9px] font-bold font-mono">
+                            <button
+                              onClick={() => setViewingMemberDetails(m)}
+                              className="px-2 py-1 bg-blue-600 text-white hover:bg-blue-500 rounded uppercase cursor-pointer transition-all animate-none"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => handleManualCheckIn(m.member_id, m.name)}
+                              className="px-2 py-1 bg-green-600 text-white hover:bg-green-500 rounded uppercase cursor-pointer transition-all animate-none"
+                            >
+                              Check In
+                            </button>
                             <button
                               onClick={() => {
                                 setEditingMember(m);
@@ -4612,6 +4657,82 @@ ${xmlRows}
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* VIEW MEMBER DETAILS MODAL */}
+      {viewingMemberDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setViewingMemberDetails(null)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 transition-colors duration-300 rounded-xl p-6 text-zinc-900 dark:text-white space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-900 pb-3">
+              <h3 className="font-display font-black italic text-lg uppercase text-yellow-500 dark:text-yellow-400">
+                Gym Member Profile
+              </h3>
+              <button type="button" onClick={() => setViewingMemberDetails(null)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Member ID:</span>
+                <span className="text-sm font-bold text-yellow-500">{viewingMemberDetails.member_id}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Full Name:</span>
+                <span className="text-sm font-sans font-bold text-zinc-800 dark:text-white">{viewingMemberDetails.name}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Email Address:</span>
+                <span className="text-zinc-800 dark:text-zinc-200">{viewingMemberDetails.email || 'N/A'}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Phone Number:</span>
+                <span className="text-zinc-800 dark:text-zinc-200">{viewingMemberDetails.phone}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Membership Plan:</span>
+                <span className="text-zinc-800 dark:text-zinc-200 uppercase">{viewingMemberDetails.membership_type}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Account Status:</span>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                  viewingMemberDetails.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200' : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200'
+                }`}>{viewingMemberDetails.status}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Joined Date:</span>
+                <span className="text-zinc-800 dark:text-zinc-200">{viewingMemberDetails.start_date}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-zinc-400 block font-bold">Expiration Date:</span>
+                <span className="text-zinc-800 dark:text-zinc-200 font-bold">{viewingMemberDetails.end_date}</span>
+              </div>
+              <div className="space-y-1 col-span-2">
+                <span className="text-zinc-400 block font-bold">Activation Status:</span>
+                <span className="text-zinc-800 dark:text-zinc-200">
+                  {viewingMemberDetails.account_activated ? `✅ Activated (At: ${viewingMemberDetails.activated_at ? new Date(viewingMemberDetails.activated_at).toLocaleString('en-IN') : '—'})` : '❌ Unactivated (First time login pending)'}
+                </span>
+              </div>
+              {viewingMemberDetails.notes && (
+                <div className="space-y-1 col-span-2">
+                  <span className="text-zinc-400 block font-bold">Admin Notes:</span>
+                  <span className="text-zinc-800 dark:text-zinc-200 block p-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 rounded">{viewingMemberDetails.notes}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-zinc-150 dark:border-zinc-900">
+              <button
+                type="button"
+                onClick={() => setViewingMemberDetails(null)}
+                className="px-4 py-2 bg-yellow-450 dark:bg-yellow-400 text-black hover:bg-yellow-300 rounded text-xs font-bold uppercase tracking-widest font-mono"
+              >
+                Close View
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

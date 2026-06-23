@@ -413,6 +413,10 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   initialBodyMetrics
 }) => {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Dashboard Tabs
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'diet' | 'coach' | 'workouts' | 'settings'>('dashboard');
@@ -1217,6 +1221,16 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const waPhone = settings?.contact_phone || '9666345644';
   const waText = `Hello RAN Fitness,\nI would like to renew my membership.\nMember ID: ${member.member_id}`;
   const waUrl = `https://wa.me/91${waPhone}?text=${encodeURIComponent(waText)}`;
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs font-mono font-bold tracking-widest text-zinc-500 uppercase animate-pulse">Loading Member Portal...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
