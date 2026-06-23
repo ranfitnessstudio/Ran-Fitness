@@ -49,7 +49,14 @@ export async function POST(request: Request) {
     }
 
     // Pre-registered lookup
-    const member = await db.getMemberByEmailAndPhone(email, phone);
+    let member;
+    try {
+      member = await db.getMemberByEmailAndPhone(email, phone);
+    } catch (lookupErr) {
+      console.error("[ACTIVATION LOOKUP ERROR]", lookupErr);
+      throw lookupErr;
+    }
+
     if (!member) {
       return NextResponse.json(
         { success: false, error: 'No active gym membership found. Please contact reception.' },
@@ -60,7 +67,7 @@ export async function POST(request: Request) {
     // Already activated check
     if (member.account_activated || member.password_hash) {
       return NextResponse.json(
-        { success: false, error: 'Account already activated. Please login or use Forgot Password.' },
+        { success: false, error: 'Account already activated. Please login.' },
         { status: 400 }
       );
     }
@@ -118,7 +125,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(responsePayload);
   } catch (error: any) {
-    console.error('[REGISTER ERROR]', error);
+    console.error("[REGISTER ROUTE ERROR]", error);
     return NextResponse.json(
       {
         success: false,

@@ -16,13 +16,7 @@ if (!process.env.SMTP_HOST || !process.env.SMTP_PORT || !process.env.SMTP_USER |
     !process.env.FROM_EMAIL && 'FROM_EMAIL'
   ].filter(Boolean).join(', ');
 
-  const warnMsg = `[SMTP WARNING] Startup audit detected missing environment variables: ${missing}.`;
-  console.warn(warnMsg);
-
-  const isBuild = process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_BUILD === 'true';
-  if (process.env.NODE_ENV === 'production' && !isBuild) {
-    throw new Error(`CRITICAL: Production startup failed due to missing SMTP configurations: ${missing}`);
-  }
+  console.error(`[SMTP ERROR] Startup validation failed. Missing environment variables: ${missing}`);
 }
 
 let cachedTransporter: any = null;
@@ -30,10 +24,20 @@ let isTransporterVerified = false;
 
 const getTransporter = () => {
   const isBuild = process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_BUILD === 'true';
-  if (process.env.NODE_ENV === 'production' && !isBuild && (!user || !pass)) {
-    throw new Error('CRITICAL: Missing SMTP credentials in production mode');
+  const hasConfig = process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.FROM_EMAIL;
+
+  if (process.env.NODE_ENV === 'production' && !isBuild && !hasConfig) {
+    const missing = [
+      !process.env.SMTP_HOST && 'SMTP_HOST',
+      !process.env.SMTP_PORT && 'SMTP_PORT',
+      !process.env.SMTP_USER && 'SMTP_USER',
+      !process.env.SMTP_PASS && 'SMTP_PASS',
+      !process.env.FROM_EMAIL && 'FROM_EMAIL'
+    ].filter(Boolean).join(', ');
+    throw new Error(`CRITICAL: SMTP is not configured. Missing variables: ${missing}`);
   }
-  if (!user || !pass) {
+
+  if (!hasConfig) {
     return null;
   }
   if (cachedTransporter) return cachedTransporter;
