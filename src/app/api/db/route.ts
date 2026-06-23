@@ -60,7 +60,9 @@ const PUBLIC_ACTIONS = new Set([
   'createMemberWithOtp',
   'incrementLoginAttempts',
   'lockoutAccount',
-  'resetLoginAttempts'
+  'resetLoginAttempts',
+  'getMemberByEmailAndPhone',
+  'activateMemberAccount'
 ]);
 
 export async function POST(request: Request) {

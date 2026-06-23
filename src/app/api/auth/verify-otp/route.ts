@@ -45,43 +45,32 @@ export async function POST(request: Request) {
       let member: any = null;
 
       if (selectedPurpose === 'REGISTER') {
-        if (!registrationData || !registrationData.name || !registrationData.phone || !registrationData.password) {
+        if (!registrationData || !registrationData.phone || !registrationData.password) {
           return NextResponse.json(
             { success: false, error: 'Registration details (including password) are missing.' },
             { status: 400 }
           );
         }
 
-        // Check uniqueness constraints before creating member
-        const existingEmail = await db.getMemberByEmail(email);
-        if (existingEmail) {
+        // Retrieve existing member using email and phone
+        const memberLookup = await db.getMemberByEmailAndPhone(email, registrationData.phone);
+        if (!memberLookup) {
           return NextResponse.json(
-            { success: false, error: 'An account with this email already exists.' },
-            { status: 400 }
-          );
-        }
-
-        const existingPhone = await db.getMemberByPhone(registrationData.phone);
-        if (existingPhone) {
-          return NextResponse.json(
-            { success: false, error: 'An account with this phone number already exists.' },
-            { status: 400 }
+            { success: false, error: 'No active gym membership found. Please contact reception.' },
+            { status: 404 }
           );
         }
 
         // Hash the password
         const hashedPassword = await bcrypt.hash(registrationData.password, 10);
 
-        // Create Member
-        member = await db.createMemberWithOtp({
-          name: registrationData.name,
-          email,
-          phone: registrationData.phone,
-          password_hash: hashedPassword
-        });
+        // Activate the member
+        member = await db.activateMemberAccount(memberLookup.member_id, hashedPassword);
 
         // Dispatch Welcome Email
-        await sendWelcomeEmail(email, registrationData.name);
+        if (member) {
+          await sendWelcomeEmail(email, member.name);
+        }
       } else {
         member = await db.getMemberByEmail(email);
       }

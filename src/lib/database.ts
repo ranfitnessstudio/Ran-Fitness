@@ -138,6 +138,11 @@ export interface Member {
   created_at?: string;
   telegram_chat_id?: string;
   force_reset?: boolean;
+  login_attempts?: number;
+  lockout_until?: string;
+  account_activated?: boolean;
+  activated_at?: string;
+  email_verified?: boolean;
 }
 
 export interface MemberProgress {
@@ -944,6 +949,9 @@ async function ensureDbInitialized() {
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0`;
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS lockout_until TIMESTAMPTZ`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS account_activated BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ NULL`;
+    await sql`UPDATE members SET account_activated = TRUE WHERE password_hash IS NOT NULL AND account_activated = FALSE`;
     try {
       await sql`ALTER TABLE members ADD CONSTRAINT members_email_key UNIQUE (email)`;
     } catch (e) {}
@@ -2306,7 +2314,9 @@ async saveMember(member: Partial<Member>): Promise<Member> {
     name: member.name!,
     phone: member.phone!,
     email: member.email || '',
-    password_hash: member.password_hash || '',
+    password_hash: isNew ? undefined : (member.password_hash || undefined),
+    account_activated: isNew ? false : (member.account_activated !== undefined ? member.account_activated : false),
+    email_verified: isNew ? false : (member.email_verified !== undefined ? member.email_verified : false),
     membership_type: membershipType!,
     plan_id: planId || 'p1',
     start_date,
@@ -2363,8 +2373,8 @@ async saveMember(member: Partial<Member>): Promise<Member> {
       notifyTelegramMemberUpdate(newMember.name, newMember.membership_type, label, newMember.end_date);
     } else {
       const rows = await sql`
-        INSERT INTO members (member_id, name, phone, email, password_hash, membership_type, plan_id, start_date, end_date, status, notes, created_at)
-        VALUES (${newMember.member_id}, ${newMember.name}, ${newMember.phone}, ${newMember.email}, ${newMember.password_hash}, ${newMember.membership_type}, ${newMember.plan_id}, ${newMember.start_date}, ${newMember.end_date}, ${newMember.status}, ${newMember.notes}, ${newMember.created_at})
+        INSERT INTO members (member_id, name, phone, email, password_hash, membership_type, plan_id, start_date, end_date, status, notes, created_at, account_activated, email_verified)
+        VALUES (${newMember.member_id}, ${newMember.name}, ${newMember.phone}, ${newMember.email}, NULL, ${newMember.membership_type}, ${newMember.plan_id}, ${newMember.start_date}, ${newMember.end_date}, ${newMember.status}, ${newMember.notes}, ${newMember.created_at}, FALSE, FALSE)
         RETURNING *
       `;
       savedRow = rows[0] as unknown as Member;
@@ -3973,6 +3983,45 @@ async autoUpdateMembershipStatuses(): Promise<void> {
         SET login_attempts = 0, lockout_until = NULL 
         WHERE member_id = ${memberId}
         RETURNING login_attempts, lockout_until
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async getMemberByEmailAndPhone(email: string, phone: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('getMemberByEmailAndPhone', [email, phone]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        SELECT * FROM members 
+        WHERE LOWER(email) = LOWER(${email}) AND phone = ${phone}
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async activateMemberAccount(memberId: string, passwordHash: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('activateMemberAccount', [memberId, passwordHash]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE members
+        SET password_hash = ${passwordHash},
+            account_activated = TRUE,
+            email_verified = TRUE,
+            activated_at = NOW(),
+            updated_at = NOW(),
+            status = 'Active'
+        WHERE member_id = ${memberId} OR id = ${parseInt(memberId) || 0}
+        RETURNING *
       `;
       return rows[0] || null;
     }

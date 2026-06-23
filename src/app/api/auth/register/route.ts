@@ -6,12 +6,12 @@ import { sendOtpEmail } from '@/lib/email';
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { name, email, phone, password, confirmPassword } = body;
+    const { email, phone, password, confirmPassword } = body;
 
     // Standard validations
-    if (!name || !email || !phone || !password || !confirmPassword) {
+    if (!email || !phone || !password || !confirmPassword) {
       return NextResponse.json(
-        { success: false, error: 'Full name, email, phone number, password, and confirm password are required.' },
+        { success: false, error: 'Email, phone number, password, and confirm password are required.' },
         { status: 400 }
       );
     }
@@ -47,19 +47,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Uniqueness checks
-    const existingEmail = await db.getMemberByEmail(email);
-    if (existingEmail) {
+    // Pre-registered lookup
+    const member = await db.getMemberByEmailAndPhone(email, phone);
+    if (!member) {
       return NextResponse.json(
-        { success: false, error: 'An account with this email already exists.' },
-        { status: 400 }
+        { success: false, error: 'No active gym membership found. Please contact reception.' },
+        { status: 404 }
       );
     }
 
-    const existingPhone = await db.getMemberByPhone(phone);
-    if (existingPhone) {
+    // Already activated check
+    if (member.account_activated || member.password_hash) {
       return NextResponse.json(
-        { success: false, error: 'An account with this phone number already exists.' },
+        { success: false, error: 'Account already activated. Please login or use Forgot Password.' },
         { status: 400 }
       );
     }

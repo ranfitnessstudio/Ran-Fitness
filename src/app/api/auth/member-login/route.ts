@@ -117,6 +117,15 @@ export async function POST(request: Request) {
 
     const member = matchedMember;
 
+    // Check if activated
+    if (!member.account_activated) {
+      console.log(`[MEMBER-LOGIN-AUDIT] Account is not activated.`);
+      return NextResponse.json(
+        { success: false, error: 'Please activate your gym account first.' },
+        { status: 403 }
+      );
+    }
+
     // Reset login attempts on successful auth
     await db.resetLoginAttempts(member.member_id);
 
