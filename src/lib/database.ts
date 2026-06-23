@@ -941,6 +941,9 @@ async function ensureDbInitialized() {
 
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS force_reset BOOLEAN DEFAULT FALSE`;
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0`;
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS lockout_until TIMESTAMPTZ`;
     try {
       await sql`ALTER TABLE members ADD CONSTRAINT members_email_key UNIQUE (email)`;
     } catch (e) {}
@@ -3917,6 +3920,61 @@ async autoUpdateMembershipStatuses(): Promise<void> {
         RETURNING *
       `;
       return rows[0];
+    }
+    return null;
+  },
+
+  async incrementLoginAttempts(memberId: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('incrementLoginAttempts', [memberId]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE members 
+        SET login_attempts = COALESCE(login_attempts, 0) + 1 
+        WHERE member_id = ${memberId}
+        RETURNING login_attempts
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async lockoutAccount(memberId: string, durationMinutes: number): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('lockoutAccount', [memberId, durationMinutes]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const lockoutUntil = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+      const rows = await sql`
+        UPDATE members 
+        SET lockout_until = ${lockoutUntil}
+        WHERE member_id = ${memberId}
+        RETURNING lockout_until
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async resetLoginAttempts(memberId: string): Promise<any> {
+    if (typeof window !== 'undefined') {
+      return await clientProxy<any>('resetLoginAttempts', [memberId]);
+    }
+    if (databaseUrl) {
+      await ensureDbInitialized();
+      const sql = neon(databaseUrl);
+      const rows = await sql`
+        UPDATE members 
+        SET login_attempts = 0, lockout_until = NULL 
+        WHERE member_id = ${memberId}
+        RETURNING login_attempts, lockout_until
+      `;
+      return rows[0] || null;
     }
     return null;
   }

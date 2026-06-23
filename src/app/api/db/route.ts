@@ -55,7 +55,12 @@ const PUBLIC_ACTIONS = new Set([
   'cleanExpiredOtps',
   'getMemberByEmail',
   'getMemberByPhone',
-  'createMemberWithOtp'
+  'getMembersByEmail',
+  'getMembersByPhone',
+  'createMemberWithOtp',
+  'incrementLoginAttempts',
+  'lockoutAccount',
+  'resetLoginAttempts'
 ]);
 
 export async function POST(request: Request) {

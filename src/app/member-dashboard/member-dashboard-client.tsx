@@ -415,7 +415,66 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
   const router = useRouter();
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'diet' | 'coach' | 'workouts'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'diet' | 'coach' | 'workouts' | 'settings'>('dashboard');
+
+  // Change Password States
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsSuccess, setSettingsSuccess] = useState('');
+  const [settingsSubmitting, setSettingsSubmitting] = useState(false);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsError('');
+    setSettingsSuccess('');
+    
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setSettingsError('All fields are required.');
+      return;
+    }
+    
+    if (newPassword !== confirmNewPassword) {
+      setSettingsError('Passwords do not match.');
+      return;
+    }
+
+    const { validatePassword } = require('@/lib/validation');
+    if (!validatePassword(newPassword)) {
+      setSettingsError('Password must be at least 8 characters and contain uppercase, lowercase, numbers, and special characters.');
+      return;
+    }
+
+    setSettingsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: member.member_id,
+          currentPassword,
+          newPassword
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setSettingsError(data.error || 'Failed to update password.');
+        setSettingsSubmitting(false);
+        return;
+      }
+      
+      setSettingsSuccess('Password Updated Successfully! Redirecting...');
+      setTimeout(() => {
+        router.push('/api/auth/logout');
+      }, 2000);
+    } catch (err: any) {
+      setSettingsError(err.message || 'An error occurred.');
+      setSettingsSubmitting(false);
+    }
+  };
 
   // Database States
     const [activeIndices, setActiveIndices] = useState<Record<string, number>>({});
@@ -1239,7 +1298,8 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
             { id: 'analytics', label: '📊 Body Analytics' },
             { id: 'workouts', label: '🏋️ Workouts' },
             { id: 'diet', label: '🥗 Diet & Notes' },
-            { id: 'coach', label: '🤖 Coach Zeus' }
+            { id: 'coach', label: '🤖 Coach Zeus' },
+            { id: 'settings', label: '⚙️ Account Settings' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -2374,6 +2434,94 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="space-y-6 animate-fade-in pb-16">
+              <div className="border-b border-zinc-800 pb-5">
+                <h2 className="font-display text-2xl font-black italic uppercase text-white tracking-wide">
+                  Account Settings
+                </h2>
+                <p className="text-xs text-zinc-400 font-mono mt-1">
+                  Manage your credentials and security preferences.
+                </p>
+              </div>
+
+              <div className="max-w-md bg-zinc-900/30 border border-zinc-850 rounded-2xl p-6 shadow-xl space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-yellow-400 font-mono mb-1">
+                    🛡️ Change Password
+                  </h3>
+                  <p className="text-[10px] text-zinc-500 font-mono">
+                    Ensure your account is protected with a high-strength password. Changing your password will invalidate your current session and require logging back in.
+                  </p>
+                </div>
+
+                {settingsError && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-950/30 p-3 text-xs text-red-400 animate-in fade-in">
+                    {settingsError}
+                  </div>
+                )}
+
+                {settingsSuccess && (
+                  <div className="rounded-lg border border-green-500/20 bg-green-950/30 p-3 text-xs text-green-400 font-bold animate-in fade-in">
+                    {settingsSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold font-mono">
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none placeholder-zinc-650"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold font-mono">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none placeholder-zinc-650"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold font-mono">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none placeholder-zinc-650"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={settingsSubmitting}
+                    className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
+                  >
+                    {settingsSubmitting ? 'Updating...' : 'Update Password'}
+                  </button>
+                </form>
               </div>
             </div>
           )}

@@ -6,11 +6,29 @@ const user = process.env.SMTP_USER || '';
 const pass = process.env.SMTP_PASS || '';
 const from = process.env.FROM_EMAIL || 'verification@ranfitness.com';
 
+// Startup environment audit warning
+if (!process.env.SMTP_HOST || !process.env.SMTP_PORT || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.FROM_EMAIL) {
+  console.warn(`[SMTP WARNING] Startup audit detected missing environment variables: ${
+    [
+      !process.env.SMTP_HOST && 'SMTP_HOST',
+      !process.env.SMTP_PORT && 'SMTP_PORT',
+      !process.env.SMTP_USER && 'SMTP_USER',
+      !process.env.SMTP_PASS && 'SMTP_PASS',
+      !process.env.FROM_EMAIL && 'FROM_EMAIL'
+    ].filter(Boolean).join(', ')
+  }. Transporter will mock actions.`);
+}
+
+let cachedTransporter: any = null;
+let isTransporterVerified = false;
+
 const getTransporter = () => {
   if (!user || !pass) {
     return null;
   }
-  return nodemailer.createTransport({
+  if (cachedTransporter) return cachedTransporter;
+
+  cachedTransporter = nodemailer.createTransport({
     host,
     port,
     secure: port === 465,
@@ -19,7 +37,22 @@ const getTransporter = () => {
       pass,
     },
   });
+  return cachedTransporter;
 };
+
+async function verifyTransporter(transporter: any): Promise<boolean> {
+  if (isTransporterVerified) return true;
+  try {
+    console.log('[SMTP] Verifying connection with transporter...');
+    await transporter.verify();
+    isTransporterVerified = true;
+    console.log('[SMTP] Transporter verified successfully.');
+    return true;
+  } catch (error) {
+    console.error('[SMTP] Transporter verification failed:', error);
+    return false;
+  }
+}
 
 export async function sendOtpEmail(email: string, otp: string): Promise<boolean> {
   const transporter = getTransporter();
@@ -38,6 +71,7 @@ If you did not request this code please ignore this email.`;
   }
 
   try {
+    await verifyTransporter(transporter);
     await transporter.sendMail({
       from,
       to: email,
@@ -67,6 +101,7 @@ You may now access your dashboard.`;
   }
 
   try {
+    await verifyTransporter(transporter);
     await transporter.sendMail({
       from,
       to: email,

@@ -54,10 +54,32 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`[MEMBER-LOGIN-AUDIT] Members found: ${members.length}. Scanning for password match.`);
+    // Lockout Check
+    let allLocked = true;
+    let lockoutMessage = '';
+    const activeMembers = [];
+
+    for (const member of members) {
+      if (member.lockout_until && new Date(member.lockout_until).getTime() > Date.now()) {
+        console.log(`[MEMBER-LOGIN-AUDIT] Member ${member.member_id} is currently locked out until ${member.lockout_until}.`);
+        lockoutMessage = `Account locked due to too many failed attempts. Try again after ${new Date(member.lockout_until).toLocaleTimeString()}.`;
+      } else {
+        allLocked = false;
+        activeMembers.push(member);
+      }
+    }
+
+    if (activeMembers.length === 0 && allLocked) {
+      return NextResponse.json(
+        { success: false, error: lockoutMessage || 'Account is currently locked out.' },
+        { status: 423 }
+      );
+    }
+
+    console.log(`[MEMBER-LOGIN-AUDIT] Members found: ${activeMembers.length} active. Scanning for password match.`);
 
     let matchedMember = null;
-    for (const member of members) {
+    for (const member of activeMembers) {
       console.log(`[MEMBER-LOGIN-AUDIT] Checking member: ${member.member_id}, Status: ${member.status}, Force Reset: ${member.force_reset}, Password Hash length: ${member.password_hash ? member.password_hash.length : 0}`);
       
       // Check if account has been activated (has password_hash)
@@ -79,6 +101,14 @@ export async function POST(request: Request) {
 
     if (!matchedMember) {
       console.log(`[MEMBER-LOGIN-AUDIT] No matching member password hash found in the list.`);
+      // Increment login attempts for all active matched members
+      for (const member of activeMembers) {
+        const updated = await db.incrementLoginAttempts(member.member_id);
+        if (updated && updated.login_attempts >= 5) {
+          await db.lockoutAccount(member.member_id, 15); // 15 mins lockout
+          console.log(`[MEMBER-LOGIN-AUDIT] Member ${member.member_id} locked out due to consecutive failures.`);
+        }
+      }
       return NextResponse.json(
         { success: false, error: 'Invalid identifier or password.' },
         { status: 401 }
@@ -86,6 +116,9 @@ export async function POST(request: Request) {
     }
 
     const member = matchedMember;
+
+    // Reset login attempts on successful auth
+    await db.resetLoginAttempts(member.member_id);
 
     // Check if suspended
     if (member.status === 'Suspended') {
@@ -117,10 +150,10 @@ export async function POST(request: Request) {
     const { generateMemberSessionCookieValue } = require('@/lib/auth-token');
     const signedCookieVal = await generateMemberSessionCookieValue(member.member_id, member.password_hash);
 
-    // Set ran_member_session cookie with member_id
+    // Set ran_member_session cookie with member_id and SameSite=Strict
     response.headers.set(
       'Set-Cookie',
-      `ran_member_session=${signedCookieVal}; Path=/; Max-Age=7200; SameSite=Lax; HttpOnly`
+      `ran_member_session=${signedCookieVal}; Path=/; Max-Age=7200; SameSite=Strict; HttpOnly; Secure`
     );
 
     console.log(`[MEMBER-LOGIN-AUDIT] Cookie established. Login complete.`);

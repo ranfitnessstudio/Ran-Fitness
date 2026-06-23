@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       }
 
       // Create authenticated session
-      const cookieValue = await generateMemberSessionCookieValue(member.member_id);
+      const cookieValue = await generateMemberSessionCookieValue(member.member_id, member.password_hash);
       
       const response = NextResponse.json({
         success: true,
@@ -102,11 +102,11 @@ export async function POST(request: Request) {
         member
       });
 
-      // Set HttpOnly secure session cookie
+      // Set HttpOnly secure session cookie with SameSite=Strict
       response.cookies.set('ran_member_session', cookieValue, {
         httpOnly: true,
         secure: true,
-        sameSite: 'lax',
+        sameSite: 'strict',
         path: '/',
         maxAge: 30 * 24 * 60 * 60 // 30 Days
       });
