@@ -57,14 +57,24 @@ async function sendSystemAlert(errorDetails: string) {
   }
 
   try {
-    const alertState = await db.getAlertState();
-    const lastAlerted = new Date(alertState.lastAlertedAt).getTime();
-    const now = Date.now();
-    const thirtyMinutesInMs = 30 * 60 * 1000;
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl) {
+      const { neon } = require('@neondatabase/serverless');
+      const sql = neon(databaseUrl);
+      
+      // Check current outage state
+      const rows = await sql`SELECT healthy FROM ai_provider_status WHERE provider = 'alert_state'`;
+      if (rows.length > 0) {
+        const alertState = rows[0];
+        // If healthy is false, it means we are ALREADY in an outage and have already alerted.
+        if (alertState.healthy === false) {
+          console.log('[AI ALERT] Already in outage state. Alert skipped.');
+          return;
+        }
+      }
 
-    if (now - lastAlerted < thirtyMinutesInMs) {
-      console.log('[AI ALERT THROTTLED]');
-      return;
+      // Transition to outage (healthy = false)
+      await sql`UPDATE ai_provider_status SET healthy = false, last_checked_at = NOW() WHERE provider = 'alert_state'`;
     }
 
     const istTime = new Date().toLocaleString('en-IN', {
@@ -83,7 +93,6 @@ async function sendSystemAlert(errorDetails: string) {
 
     if (res.ok) {
       console.log('[AI ALERT SENT]');
-      await db.updateAlertState(new Date().toISOString());
     } else {
       console.error('Failed to send Telegram alert:', res.status, await res.text());
     }

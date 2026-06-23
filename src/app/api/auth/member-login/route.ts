@@ -20,32 +20,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const isEmail = identifier.includes('@');
-    if (isEmail) {
-      console.log(`[MEMBER-LOGIN-AUDIT] Identifier detected as email.`);
-      if (!validateEmail(identifier)) {
-        console.log(`[MEMBER-LOGIN-AUDIT] Email formatting check failed: ${identifier}`);
-        return NextResponse.json(
-          { success: false, error: 'Invalid email address format.' },
-          { status: 400 }
-        );
-      }
-    } else {
-      const isValidPhone = /^\+?\d{8,15}$/.test(identifier);
-      if (!isValidPhone) {
-        console.log(`[MEMBER-LOGIN-AUDIT] Phone formatting check failed: ${identifier}`);
-        return NextResponse.json(
-          { success: false, error: 'Phone number must be between 8 and 15 digits.' },
-          { status: 400 }
-        );
-      }
+    if (!validateEmail(identifier)) {
+      console.log(`[MEMBER-LOGIN-AUDIT] Email formatting check failed: ${identifier}`);
+      return NextResponse.json(
+        { success: false, error: 'Invalid email address format.' },
+        { status: 400 }
+      );
     }
 
     // Retrieve member
     console.log(`[MEMBER-LOGIN-AUDIT] Running db lookup for: ${identifier}`);
-    const members = isEmail
-      ? await db.getMembersByEmail(identifier)
-      : await db.getMembersByPhone(identifier);
+    const members = await db.getMembersByEmail(identifier);
 
     if (!members || members.length === 0) {
       console.log(`[MEMBER-LOGIN-AUDIT] Member lookup failed: No record found for ${identifier}`);

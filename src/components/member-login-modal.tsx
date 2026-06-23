@@ -420,12 +420,12 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold flex items-center gap-1">
-                      <Mail size={10} /> Phone Number or Email
+                      <Mail size={10} /> Email Address
                     </label>
                     <input
-                      type="text"
+                      type="email"
                       required
-                      placeholder="Email or 10-digit Phone"
+                      placeholder="name@example.com"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-600"
