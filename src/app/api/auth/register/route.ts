@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
 import bcrypt from 'bcryptjs';
 import { sendOtpEmail } from '@/lib/email';
+import { validatePassword, validatePhone } from '@/lib/validation';
+import { neon } from '@neondatabase/serverless';
+import crypto from 'crypto';
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +26,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const { validatePassword } = require('@/lib/validation');
     if (!validatePassword(password)) {
       return NextResponse.json(
         { success: false, error: 'Password must be at least 8 characters and contain uppercase, lowercase, numbers, and special characters.' },
@@ -39,7 +41,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const { validatePhone } = require('@/lib/validation');
     if (!validatePhone(phone)) {
       return NextResponse.json(
         { success: false, error: 'Phone number must be exactly 10 digits starting with 6-9.' },
@@ -67,7 +68,6 @@ export async function POST(request: Request) {
     // Rate Limiting check: 5 requests per 15 minutes per email/IP
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
-      const { neon } = require('@neondatabase/serverless');
       const sql = neon(databaseUrl);
       const recentCount = await sql`
         SELECT COUNT(*)::int as count FROM otp 
@@ -83,7 +83,6 @@ export async function POST(request: Request) {
     }
 
     // Generate secure 6-digit OTP
-    const crypto = require('crypto');
     let otpVal: number;
     try {
       otpVal = crypto.randomInt(100000, 999999);

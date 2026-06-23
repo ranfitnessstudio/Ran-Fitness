@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
 import bcrypt from 'bcryptjs';
+import { validateEmail } from '@/lib/validation';
+import { generateMemberSessionCookieValue } from '@/lib/auth-token';
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +23,6 @@ export async function POST(request: Request) {
     const isEmail = identifier.includes('@');
     if (isEmail) {
       console.log(`[MEMBER-LOGIN-AUDIT] Identifier detected as email.`);
-      const { validateEmail } = require('@/lib/validation');
       if (!validateEmail(identifier)) {
         console.log(`[MEMBER-LOGIN-AUDIT] Email formatting check failed: ${identifier}`);
         return NextResponse.json(
@@ -156,7 +157,6 @@ export async function POST(request: Request) {
       }
     });
 
-    const { generateMemberSessionCookieValue } = require('@/lib/auth-token');
     const signedCookieVal = await generateMemberSessionCookieValue(member.member_id, member.password_hash);
 
     // Set ran_member_session cookie with member_id and SameSite=Strict
