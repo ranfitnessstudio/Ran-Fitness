@@ -944,14 +944,46 @@ async function ensureDbInitialized() {
       )
     `;
 
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS force_reset BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0`;
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS lockout_until TIMESTAMPTZ`;
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS account_activated BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ NULL`;
-    await sql`UPDATE members SET account_activated = TRUE WHERE password_hash IS NOT NULL AND account_activated = FALSE`;
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS force_reset BOOLEAN DEFAULT FALSE`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add force_reset column:', e);
+    }
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add email_verified column:', e);
+    }
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add updated_at column:', e);
+    }
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add login_attempts column:', e);
+    }
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS lockout_until TIMESTAMPTZ`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add lockout_until column:', e);
+    }
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS account_activated BOOLEAN DEFAULT FALSE`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add account_activated column:', e);
+    }
+    try {
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ NULL`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to add activated_at column:', e);
+    }
+    try {
+      await sql`UPDATE members SET account_activated = TRUE WHERE password_hash IS NOT NULL AND account_activated = FALSE`;
+    } catch (e) {
+      console.warn('[DB WARNING] Failed to run account_activated migration:', e);
+    }
     try {
       await sql`ALTER TABLE members ADD CONSTRAINT members_email_key UNIQUE (email)`;
     } catch (e) {}

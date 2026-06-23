@@ -115,7 +115,13 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
         body: JSON.stringify({ email, phone, password, confirmPassword })
       });
 
-      const data = await res.json();
+      let data;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error(`Server returned invalid response: ${text.substring(0, 200)}`);
+      }
       if (!res.ok || !data.success) {
         setError(data.error || 'Activation initiation failed.');
         setIsSubmitting(false);
@@ -205,7 +211,13 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      let data;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error(`Server returned invalid response: ${text.substring(0, 200)}`);
+      }
       if (!res.ok || !data.success) {
         setError(data.error || 'Verification failed.');
         if (data.error && data.error.includes('attempts remaining')) {

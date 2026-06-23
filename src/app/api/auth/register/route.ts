@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (!member) {
       return NextResponse.json(
         { success: false, error: 'No active gym membership found. Please contact reception.' },
-        { status: 404 }
+        { status: 400 }
       );
     }
 
@@ -120,7 +120,10 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('[REGISTER ERROR]', error);
     return NextResponse.json(
-      { success: false, error: 'Internal Server Error' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Registration failed'
+      },
       { status: 500 }
     );
   }
