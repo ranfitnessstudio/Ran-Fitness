@@ -1540,8 +1540,8 @@ export const db = {
     if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
-      console.log('[NEON READ] SELECT * FROM plans ORDER BY price');
       const rows = await sql`SELECT * FROM plans ORDER BY price`;
+      console.log('[DB PLANS]', rows);
       return rows as unknown as MembershipPlan[];
     }
     console.warn('[LOCALSTORAGE FALLBACK DISABLED] No database url, returning empty array');

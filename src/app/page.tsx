@@ -542,10 +542,15 @@ export default function Home() {
       console.error('Failed to load page content:', err);
     }
   };
-
   useEffect(() => {
     loadContent();
-    
+  }, []);
+
+  useEffect(() => {
+    console.log('[FRONTEND PLANS]', plans);
+  }, [plans]);
+
+  useEffect(() => {
     // Theme initialization
     const storedTheme = localStorage.getItem('ran_fitness_color_theme');
     if (storedTheme === 'light' || storedTheme === 'dark') {
