@@ -1178,9 +1178,15 @@ async function clientProxy<T>(action: string, args: unknown[] = []): Promise<T |
     if (res.ok) {
       const data = await res.json();
       if (data.success) return data.result as T;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 || data.error?.includes('Conflict') || data.error?.includes('already exists') || data.error?.includes('CONFLICT:')) {
+        throw new Error(data.error || 'Conflict: Duplicate record detected.');
+      }
     }
-  } catch (e) {
+  } catch (e: any) {
     console.warn(`Client DB proxy failed for ${action}:`, e);
+    throw e;
   }
   return null;
 }
@@ -2301,10 +2307,14 @@ async saveMember(member: Partial<Member>): Promise<Member> {
     } else if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
-      const rows = await sql`SELECT member_id FROM members ORDER BY id DESC LIMIT 1`;
+      const rows = await sql`SELECT member_id FROM members WHERE member_id LIKE 'RF%'`;
       if (rows.length > 0) {
-        const matchNum = parseInt(rows[0].member_id.replace('RF', ''));
-        if (!isNaN(matchNum)) nextNum = matchNum + 1;
+        const ids = rows.map(r => {
+          const num = parseInt(r.member_id.replace('RF', ''));
+          return isNaN(num) ? 0 : num;
+        });
+        const highest = Math.max(...ids, 1000);
+        nextNum = highest + 1;
       }
     }
     member_id = `RF${nextNum}`;
@@ -2384,6 +2394,42 @@ async saveMember(member: Partial<Member>): Promise<Member> {
   if (databaseUrl) {
     await ensureDbInitialized();
     const sql = neon(databaseUrl);
+
+    // Duplicate checks before insert/update
+    if (isNew) {
+      const existingId = await sql`SELECT id FROM members WHERE member_id = ${newMember.member_id}`;
+      if (existingId.length > 0) {
+        throw new Error(`CONFLICT: Member ID ${newMember.member_id} already exists.`);
+      }
+
+      if (newMember.email) {
+        const existingEmail = await sql`SELECT id, member_id FROM members WHERE LOWER(email) = LOWER(${newMember.email})`;
+        if (existingEmail.length > 0) {
+          throw new Error(`CONFLICT: Email ${newMember.email} is already registered under Member ID ${existingEmail[0].member_id}.`);
+        }
+      }
+
+      if (newMember.phone) {
+        const existingPhone = await sql`SELECT id, member_id FROM members WHERE phone = ${newMember.phone}`;
+        if (existingPhone.length > 0) {
+          throw new Error(`CONFLICT: Phone number ${newMember.phone} is already registered under Member ID ${existingPhone[0].member_id}.`);
+        }
+      }
+    } else if (member.id) {
+      if (newMember.email) {
+        const existingEmail = await sql`SELECT id, member_id FROM members WHERE LOWER(email) = LOWER(${newMember.email}) AND id <> ${member.id}`;
+        if (existingEmail.length > 0) {
+          throw new Error(`CONFLICT: Email ${newMember.email} is already registered under Member ID ${existingEmail[0].member_id}.`);
+        }
+      }
+      if (newMember.phone) {
+        const existingPhone = await sql`SELECT id, member_id FROM members WHERE phone = ${newMember.phone} AND id <> ${member.id}`;
+        if (existingPhone.length > 0) {
+          throw new Error(`CONFLICT: Phone number ${newMember.phone} is already registered under Member ID ${existingPhone[0].member_id}.`);
+        }
+      }
+    }
+
     let savedRow;
     if (member.id) {
       const rows = await sql`

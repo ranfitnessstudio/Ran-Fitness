@@ -182,9 +182,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
     console.error(`Database API Proxy failure [${request.method}]:`, error);
+    let status = 500;
+    let errMsg = error.message || 'Internal Database Server Error';
+    if (errMsg.includes('CONFLICT:')) {
+      status = 409;
+      errMsg = errMsg.replace('CONFLICT:', '').trim();
+    }
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal Database Server Error' },
-      { status: 500 }
+      { success: false, error: errMsg },
+      { status }
     );
   }
 }
