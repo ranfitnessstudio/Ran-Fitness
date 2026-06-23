@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://ranfitness.com'),
   icons: {
     icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png"
   },
   openGraph: {
