@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
 import bcrypt from 'bcryptjs';
-import { sendOtpEmail } from '@/lib/email';
 import { validatePassword, validatePhone } from '@/lib/validation';
-import { neon } from '@neondatabase/serverless';
-import crypto from 'crypto';
+import { generateMemberSessionCookieValue } from '@/lib/auth-token';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const { email, phone, password, confirmPassword } = body;
 
-    // Standard validations
+    console.log(`[ACTIVATION LOOKUP] Email: ${email}, Phone: ${phone ? phone.substring(0, 4) + '****' : 'MISSING'}`);
+
+    // ── Input validation ──────────────────────────────────────
     if (!email || !phone || !password || !confirmPassword) {
       return NextResponse.json(
         { success: false, error: 'Email, phone number, password, and confirm password are required.' },
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Pre-registered lookup
+    // ── CMS member lookup (email + phone) ─────────────────────
     let member;
     try {
       member = await db.getMemberByEmailAndPhone(email, phone);
@@ -58,78 +58,75 @@ export async function POST(request: Request) {
     }
 
     if (!member) {
+      console.log(`[ACTIVATION LOOKUP] No CMS member found for email=${email}, phone=${phone}`);
       return NextResponse.json(
         { success: false, error: 'No active gym membership found. Please contact reception.' },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
-    // Already activated check
+    // ── Already activated check ───────────────────────────────
     if (member.account_activated || member.password_hash) {
+      console.log(`[ACTIVATION LOOKUP] Member ${member.member_id} already activated.`);
       return NextResponse.json(
         { success: false, error: 'Account already activated. Please login.' },
         { status: 400 }
       );
     }
 
-    // Rate Limiting check: 5 requests per 15 minutes per email/IP
-    const databaseUrl = process.env.DATABASE_URL;
-    if (databaseUrl) {
-      const sql = neon(databaseUrl);
-      const recentCount = await sql`
-        SELECT COUNT(*)::int as count FROM otp 
-        WHERE email = ${email} AND created_at > NOW() - INTERVAL '15 minutes'
-      `;
+    // ── Direct activation: hash password and activate ─────────
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const activatedMember = await db.activateMemberAccount(member.member_id, hashedPassword);
 
-      if (recentCount[0].count >= 5) {
-        return NextResponse.json(
-          { success: false, error: 'Too many requests. Please try again after 15 minutes.' },
-          { status: 429 }
-        );
+    if (!activatedMember) {
+      console.error(`[ACTIVATION ERROR] activateMemberAccount returned null for ${member.member_id}`);
+      return NextResponse.json(
+        { success: false, error: 'Account activation failed. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[ACCOUNT ACTIVATED] member_id=${activatedMember.member_id}, email=${email}`);
+
+    // ── Auto-login: create session cookie ─────────────────────
+    const cookieValue = await generateMemberSessionCookieValue(
+      activatedMember.member_id,
+      activatedMember.password_hash
+    );
+
+    const response = NextResponse.json({
+      success: true,
+      message: 'Account activated successfully.',
+      member: {
+        id: activatedMember.id,
+        member_id: activatedMember.member_id,
+        name: activatedMember.name,
+        email: activatedMember.email,
+        phone: activatedMember.phone,
+        membership_type: activatedMember.membership_type,
+        start_date: activatedMember.start_date,
+        end_date: activatedMember.end_date,
+        status: activatedMember.status
       }
-    }
-
-    // Generate secure 6-digit OTP
-    let otpVal: number;
-    try {
-      otpVal = crypto.randomInt(100000, 999999);
-    } catch {
-      const array = new Uint32Array(1);
-      crypto.getRandomValues(array);
-      otpVal = 100000 + (array[0] % 900000);
-    }
-    const otp = String(otpVal);
-
-    const hashedOtp = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
-
-    await db.createOtpEntry({
-      email,
-      otp_hash: hashedOtp,
-      purpose: 'REGISTER',
-      expires_at: expiresAt
     });
 
-    // Send register verification code
-    await sendOtpEmail(email, otp);
+    response.cookies.set('ran_member_session', cookieValue, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 7200 // 2 hours — matches member-login
+    });
 
-    const responsePayload: any = {
-      success: true,
-      message: 'Verification OTP sent successfully.',
-      email
-    };
+    console.log(`[ACCOUNT ACTIVATED] Session cookie set for ${activatedMember.member_id}. Activation complete.`);
 
-    if (process.env.NODE_ENV === 'development') {
-      responsePayload.otp = otp;
-    }
-
-    return NextResponse.json(responsePayload);
-  } catch (error: any) {
+    return response;
+  } catch (error: unknown) {
     console.error("[REGISTER ROUTE ERROR]", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Registration failed'
+        error: error instanceof Error ? error.message : 'Activation failed'
       },
       { status: 500 }
     );

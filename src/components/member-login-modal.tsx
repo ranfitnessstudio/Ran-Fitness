@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Mail, Phone, ShieldAlert, Sparkles, Key, CheckCircle, User, Eye, EyeOff } from 'lucide-react';
+import { X, Lock, Mail, Phone, ShieldAlert, Sparkles, Key, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface MemberLoginModalProps {
@@ -17,7 +17,6 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -28,7 +27,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Timers
+  // Timers (used ONLY for forgot password OTP flow)
   const [expiryTimer, setExpiryTimer] = useState(0);
   const [resendTimer, setResendTimer] = useState(0);
   const [attemptsRemaining, setAttemptsRemaining] = useState(5);
@@ -36,7 +35,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
 
   const router = useRouter();
 
-  // Expiry Timer Ticker
+  // Expiry Timer Ticker (forgot password only)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (expiryTimer > 0) {
@@ -47,7 +46,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     return () => clearInterval(interval);
   }, [expiryTimer]);
 
-  // Resend Cooldown Timer Ticker
+  // Resend Cooldown Timer Ticker (forgot password only)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (resendTimer > 0) {
@@ -64,6 +63,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
   };
 
+  // ── LOGIN HANDLER ──────────────────────────────────────────
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -96,6 +96,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     }
   };
 
+  // ── DIRECT ACTIVATION HANDLER (NO OTP) ─────────────────────
   const handleActivationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -123,20 +124,16 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
         throw new Error(`Server returned invalid response: ${text.substring(0, 200)}`);
       }
       if (!res.ok || !data.success) {
-        setError(data.error || 'Activation initiation failed.');
+        setError(data.error || 'Activation failed.');
         setIsSubmitting(false);
         return;
       }
 
-      setSuccess('Verification OTP sent to your email!');
-      setExpiryTimer(300); // 5 minutes
-      setResendTimer(60);  // 60s cooldown
-      setAttemptsRemaining(5);
-      setResendCount(0);
-
+      // Activation successful — auto-login session cookie already set by server
+      setSuccess('Account activated successfully!');
       setTimeout(() => {
         setSuccess('');
-        setStep(2);
+        setStep(2); // Show success screen
         setIsSubmitting(false);
       }, 1000);
     } catch (err: any) {
@@ -145,6 +142,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     }
   };
 
+  // ── FORGOT PASSWORD HANDLERS (UNTOUCHED) ───────────────────
   const handleForgotPasswordRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -182,33 +180,17 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     }
   };
 
-  const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
+  const handleVerifyForgotOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setIsSubmitting(true);
 
     try {
-      const isForgot = mode === 'forgot';
-      const endpoint = isForgot ? '/api/auth/forgot-password/verify' : '/api/auth/verify-otp';
-      
-      const payload: any = {
-        email,
-        otp: otpCode,
-        purpose: isForgot ? 'FORGOT_PASSWORD' : 'REGISTER'
-      };
-
-      if (!isForgot) {
-        payload.registrationData = {
-          phone,
-          password
-        };
-      }
-
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/auth/forgot-password/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ email, otp: otpCode, purpose: 'FORGOT_PASSWORD' })
       });
 
       let data;
@@ -233,20 +215,12 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
       }
 
       setSuccess('Verification successful!');
-      if (isForgot) {
-        setResetToken(data.resetToken);
-        setTimeout(() => {
-          setSuccess('');
-          setStep(3);
-          setIsSubmitting(false);
-        }, 1000);
-      } else {
-        setTimeout(() => {
-          setSuccess('');
-          setStep(3);
-          setIsSubmitting(false);
-        }, 1000);
-      }
+      setResetToken(data.resetToken);
+      setTimeout(() => {
+        setSuccess('');
+        setStep(3);
+        setIsSubmitting(false);
+      }, 1000);
     } catch (err: any) {
       setError(err.message || 'An error occurred.');
       setIsSubmitting(false);
@@ -303,13 +277,12 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     }
 
     try {
-      const isForgot = mode === 'forgot';
       const res = await fetch('/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          purpose: isForgot ? 'FORGOT_PASSWORD' : 'REGISTER'
+          purpose: 'FORGOT_PASSWORD'
         })
       });
 
@@ -342,7 +315,6 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
     setConfirmPassword('');
     setEmail('');
     setPhone('');
-    setFullName('');
     setOtpCode('');
     setResetToken('');
   };
@@ -381,18 +353,18 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <div className="rounded-full bg-yellow-400 p-3 text-black">
                 {mode === 'login' && <Lock size={22} />}
-                {mode === 'register' && (step === 3 ? <CheckCircle size={22} /> : <Sparkles size={22} />)}
+                {mode === 'register' && (step === 2 ? <CheckCircle size={22} /> : <Sparkles size={22} />)}
                 {mode === 'forgot' && (step === 4 ? <CheckCircle size={22} /> : <Key size={22} />)}
               </div>
               <div>
                 <h3 className="font-display text-lg font-black italic tracking-widest text-white uppercase">
                   {mode === 'login' && 'MEMBER LOGIN'}
-                  {mode === 'register' && (step === 3 ? 'ACCOUNT ACTIVATED' : 'ACTIVATE ACCOUNT')}
+                  {mode === 'register' && (step === 2 ? 'ACCOUNT ACTIVATED' : 'ACTIVATE ACCOUNT')}
                   {mode === 'forgot' && (step === 4 ? 'PASSWORD UPDATED' : 'FORGOT PASSWORD')}
                 </h3>
                 <p className="text-zinc-500 text-xs mt-1 uppercase tracking-wider font-mono">
                   {mode === 'login' && 'Access your portal'}
-                  {mode === 'register' && (step === 3 ? 'Setup Complete' : 'First Time Activation')}
+                  {mode === 'register' && (step === 2 ? 'Setup Complete' : 'First Time Activation')}
                   {mode === 'forgot' && (step === 4 ? 'Reset Successful' : `Step ${step} of 4`)}
                 </p>
               </div>
@@ -415,7 +387,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
             </div>
 
             <div className="mt-5">
-              {/* FLOW 1: LOGIN */}
+              {/* ═══ FLOW 1: LOGIN ═══ */}
               {mode === 'login' && (
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div className="space-y-1.5">
@@ -463,7 +435,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
                 </form>
               )}
 
-              {/* FLOW 2: FORGOT PASSWORD */}
+              {/* ═══ FLOW 2: FORGOT PASSWORD (UNTOUCHED) ═══ */}
               {mode === 'forgot' && (
                 <>
                   {step === 1 && (
@@ -492,7 +464,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
                   )}
 
                   {step === 2 && (
-                    <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+                    <form onSubmit={handleVerifyForgotOtp} className="space-y-4">
                       <div className="space-y-1.5">
                         <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
                           Enter 6-digit OTP sent to registered email
@@ -595,7 +567,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
                 </>
               )}
 
-              {/* FLOW 3: FIRST TIME ACCOUNT ACTIVATION */}
+              {/* ═══ FLOW 3: FIRST TIME ACCOUNT ACTIVATION (DIRECT — NO OTP) ═══ */}
               {mode === 'register' && (
                 <>
                   {step === 1 && (
@@ -662,63 +634,15 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
                         disabled={isSubmitting}
                         className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors mt-2"
                       >
-                        {isSubmitting ? 'Sending OTP...' : 'Send Verification OTP'}
+                        {isSubmitting ? 'Activating...' : 'ACTIVATE ACCOUNT'}
                       </button>
                     </form>
                   )}
 
                   {step === 2 && (
-                    <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                          Enter 6-digit OTP code sent to email
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={6}
-                          placeholder="e.g. 123456"
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value)}
-                          className="w-full text-center tracking-widest font-mono text-base rounded-lg border border-zinc-800 bg-zinc-900 py-3.5 text-white focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 placeholder-zinc-650"
-                        />
-                      </div>
-
-                      <div className="flex justify-between items-center text-xs font-mono px-1">
-                        <span className="text-zinc-500">
-                          Expires: <span className="font-bold text-zinc-300">{formatTime(expiryTimer)}</span>
-                        </span>
-                        {resendTimer > 0 ? (
-                          <span className="text-zinc-500 italic">Resend in {resendTimer}s</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleResendOtp}
-                            className="text-yellow-400 hover:text-yellow-300 font-bold hover:underline"
-                          >
-                            Resend OTP
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="text-[10px] text-zinc-500 font-mono text-center flex items-center justify-center gap-1">
-                        Attempts remaining: <strong className={attemptsRemaining <= 2 ? 'text-red-500' : 'text-zinc-300'}>{attemptsRemaining}</strong>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || expiryTimer <= 0 || attemptsRemaining <= 0}
-                        className="w-full rounded-lg bg-yellow-400 py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-yellow-300 disabled:opacity-50 transition-colors"
-                      >
-                        {isSubmitting ? 'Activating...' : 'Verify & Create Account'}
-                      </button>
-                    </form>
-                  )}
-
-                  {step === 3 && (
                     <div className="space-y-4 text-center mt-2">
                       <p className="text-sm text-zinc-300 font-medium leading-relaxed">
-                        Your account activation has completed successfully and email is verified.
+                        Your account has been activated successfully! You are now logged in.
                       </p>
                       <button
                         onClick={() => {
@@ -738,7 +662,7 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({ isOpen, onCl
 
             {/* Footer Options */}
             <div className="mt-6 text-center space-y-2 border-t border-zinc-900 pt-4">
-              {mode !== 'login' && step === 2 && (
+              {mode === 'forgot' && step === 2 && (
                 <button
                   type="button"
                   onClick={handleBackToLogin}
