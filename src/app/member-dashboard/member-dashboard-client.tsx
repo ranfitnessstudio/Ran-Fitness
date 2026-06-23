@@ -986,6 +986,7 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
     setChatLoading(true);
 
     try {
+      console.log('[UI USER MESSAGE]', text);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -995,6 +996,7 @@ export const MemberDashboardClient: React.FC<MemberDashboardClientProps> = ({
         }),
       });
 
+      console.log('[UI RAW RESPONSE]', response);
       if (response.ok) {
         const data = await response.json();
         const coachMsg = {
