@@ -1106,18 +1106,14 @@ async function ensureDbInitialized() {
       }
     }
 
-    // Upsert plans to ensure new prices and plans (Half-Yearly) are loaded
-    for (const p of SEED_PLANS) {
-      await sql`
-        INSERT INTO plans (id, name, price, duration, benefits, popular_badge)
-        VALUES (${p.id}, ${p.name}, ${p.price}, ${p.duration}, ${p.benefits}, ${p.popular_badge})
-        ON CONFLICT (id) DO UPDATE SET
-          name = EXCLUDED.name,
-          price = EXCLUDED.price,
-          duration = EXCLUDED.duration,
-          benefits = EXCLUDED.benefits,
-          popular_badge = EXCLUDED.popular_badge
-      `;
+    const plansCount = await sql`SELECT COUNT(*)::int as count FROM plans`;
+    if (plansCount[0].count === 0) {
+      for (const p of SEED_PLANS) {
+        await sql`
+          INSERT INTO plans (id, name, price, duration, benefits, popular_badge)
+          VALUES (${p.id}, ${p.name}, ${p.price}, ${p.duration}, ${p.benefits}, ${p.popular_badge})
+        `;
+      }
     }
 
     const transCount = await sql`SELECT COUNT(*)::int as count FROM transformations`;
@@ -1532,39 +1528,43 @@ export const db = {
 
   // --- PLANS ---
   async getPlans(): Promise<MembershipPlan[]> {
+    console.log('[PLAN LOAD] Loading membership plans');
     if (typeof window !== 'undefined') {
+      console.log('[NEON READ] clientProxy getPlans');
       const res = await clientProxy<MembershipPlan[]>('getPlans');
       if (res !== null) return res;
-      return getLocal('plans', SEED_PLANS);
+      console.warn('[LOCALSTORAGE FALLBACK DISABLED] getPlans returned null, returning empty array');
+      return [];
     }
 
     if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
+      console.log('[NEON READ] SELECT * FROM plans ORDER BY price');
       const rows = await sql`SELECT * FROM plans ORDER BY price`;
       return rows as unknown as MembershipPlan[];
     }
-    return getLocal('plans', SEED_PLANS);
+    console.warn('[LOCALSTORAGE FALLBACK DISABLED] No database url, returning empty array');
+    return [];
   },
 
   async savePlan(plan: Omit<MembershipPlan, 'id'> & { id?: string }): Promise<MembershipPlan> {
     const id = plan.id || `p_${Date.now()}`;
     const newPlan = { ...plan, id } as MembershipPlan;
+    console.log('[PLAN SAVE] Saving plan:', newPlan);
 
     if (typeof window !== 'undefined') {
+      console.log('[NEON WRITE] clientProxy savePlan');
       const res = await clientProxy<MembershipPlan>('savePlan', [plan]);
       if (res !== null) return res;
-      const current = getLocal('plans', SEED_PLANS);
-      const index = current.findIndex(p => p.id === id);
-      if (index > -1) current[index] = newPlan;
-      else current.push(newPlan);
-      setLocal('plans', current);
+      console.warn('[LOCALSTORAGE FALLBACK DISABLED] savePlan clientProxy returned null');
       return newPlan;
     }
 
     if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
+      console.log('[NEON WRITE] INSERT/UPDATE plans table in Neon:', newPlan);
       await sql`
         INSERT INTO plans (id, name, price, duration, benefits, popular_badge)
         VALUES (${id}, ${newPlan.name}, ${newPlan.price}, ${newPlan.duration}, ${newPlan.benefits}, ${newPlan.popular_badge})
@@ -1578,39 +1578,32 @@ export const db = {
       return newPlan;
     }
 
-    const current = getLocal('plans', SEED_PLANS);
-    const index = current.findIndex(p => p.id === id);
-    if (index > -1) {
-      current[index] = newPlan;
-    } else {
-      current.push(newPlan);
-    }
-    setLocal('plans', current);
+    console.warn('[LOCALSTORAGE FALLBACK DISABLED] savePlan failed: No database url');
     return newPlan;
   },
 
   async deletePlan(id: string): Promise<boolean> {
+    console.log('[PLAN DELETE] Deleting plan ID:', id);
     if (typeof window !== 'undefined') {
+      console.log('[NEON WRITE] clientProxy deletePlan');
       const res = await clientProxy<boolean>('deletePlan', [id]);
       if (res !== null) return res;
-      const current = getLocal('plans', SEED_PLANS);
-      const filtered = current.filter(p => p.id !== id);
-      setLocal('plans', filtered);
-      return true;
+      console.warn('[LOCALSTORAGE FALLBACK DISABLED] deletePlan clientProxy returned null');
+      return false;
     }
 
     if (databaseUrl) {
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
+      console.log('[NEON WRITE] DELETE FROM plans WHERE id =', id);
       await sql`DELETE FROM plans WHERE id = ${id}`;
       return true;
     }
 
-    const current = getLocal('plans', SEED_PLANS);
-    const filtered = current.filter(p => p.id !== id);
-    setLocal('plans', filtered);
-    return true;
+    console.warn('[LOCALSTORAGE FALLBACK DISABLED] deletePlan failed: No database url');
+    return false;
   },
+
 
   // --- TRANSFORMATIONS ---
   async getTransformations(): Promise<Transformation[]> {
