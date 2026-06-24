@@ -1542,6 +1542,7 @@ export const db = {
       const sql = neon(databaseUrl);
       const rows = await sql`SELECT * FROM plans ORDER BY price`;
       console.log('[DB PLANS]', rows);
+      console.log('[GET PLANS RESPONSE]', rows);
       return rows as unknown as MembershipPlan[];
     }
     console.warn('[LOCALSTORAGE FALLBACK DISABLED] No database url, returning empty array');
@@ -1562,9 +1563,9 @@ export const db = {
     }
 
     if (databaseUrl) {
+      console.log('[DB WRITE START] ID:', id, 'Plan:', newPlan);
       await ensureDbInitialized();
       const sql = neon(databaseUrl);
-      console.log('[NEON WRITE] INSERT/UPDATE plans table in Neon:', newPlan);
       await sql`
         INSERT INTO plans (id, name, price, duration, benefits, popular_badge)
         VALUES (${id}, ${newPlan.name}, ${newPlan.price}, ${newPlan.duration}, ${newPlan.benefits}, ${newPlan.popular_badge})
@@ -1575,6 +1576,9 @@ export const db = {
           benefits = EXCLUDED.benefits,
           popular_badge = EXCLUDED.popular_badge
       `;
+      console.log('[DB WRITE SUCCESS] ID:', id);
+      const rows = await sql`SELECT * FROM plans WHERE id = ${id}`;
+      console.log('[DB READ AFTER WRITE] Query row:', rows[0]);
       return newPlan;
     }
 

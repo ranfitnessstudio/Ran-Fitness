@@ -68,6 +68,7 @@ const PUBLIC_ACTIONS = new Set([
 export async function POST(request: Request) {
   try {
     const { action, args = [] } = await request.json();
+    console.log('[API SAVE RECEIVED]', action, args);
 
     const dbMethod = (db as any)[action];
     if (typeof dbMethod !== 'function') {

@@ -836,6 +836,7 @@ export default function AdminDashboard() {
       setTrainers(tr);
       setEquipment(eq);
       setPlans(pl);
+      console.log('[FRONTEND LOAD PLANS]', pl);
       setTransformations(tf);
       setSettings(se);
       setSocials(so);
@@ -1089,6 +1090,7 @@ ${xmlRows}
 
   const savePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[CMS SAVE CLICK]', editingPlan);
     if (!editingPlan?.name || !editingPlan?.price) {
       showToastMessage('Plan name and price are required.', 'error');
       return;
