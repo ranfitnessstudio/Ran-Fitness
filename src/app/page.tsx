@@ -1976,8 +1976,8 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Desktop view */}
-              <div className="hidden lg:grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {/* Desktop and Tablet view */}
+              <div className="hidden md:grid grid-cols-2 xl:grid-cols-4 gap-8 max-w-4xl xl:max-w-7xl mx-auto">
                 {plans.map((plan) => {
                   const isHovered = hoveredPlanId === plan.id;
                   return (
@@ -2051,7 +2051,7 @@ export default function Home() {
               </div>
 
               {/* Mobile View (Carousel) */}
-              <div className="lg:hidden flex flex-col items-center">
+              <div className="md:hidden flex flex-col items-center">
                 {plans.length > 0 ? (
                   <div className="w-full max-w-sm relative px-8 flex items-center justify-center min-h-[460px]">
                     {/* Left Arrow */}
