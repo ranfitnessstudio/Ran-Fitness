@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   title: 'RAN FITNESS | Premium Gym in Habsiguda Hyderabad',
   description: 'RAN FITNESS is a premium fitness and CrossFit gym in Habsiguda, Hyderabad. Expert trainers, transformation programs, strength training, cardio, and personalized fitness coaching.',
   keywords: 'Best Gym in Habsiguda, CrossFit Gym Habsiguda, Gym Near Me, Fitness Center Habsiguda, Zumba Classes Habsiguda, Ran Fitness Hyderabad, Premium Gym Habsiguda',
-  metadataBase: new URL('https://ranfitness.com'),
+  metadataBase: new URL('https://ran-fitness.vercel.app'),
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'RAN FITNESS | Premium Gym in Habsiguda Hyderabad',
     description: 'RAN FITNESS is a premium fitness and CrossFit gym in Habsiguda, Hyderabad. Expert trainers, transformation programs, strength training, cardio, and personalized fitness coaching.',
-    url: 'https://ranfitness.com',
+    url: 'https://ran-fitness.vercel.app',
     siteName: 'RAN Fitness',
     locale: 'en_IN',
     type: 'website',
@@ -74,9 +74,9 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "Gym",
     "name": "RAN FITNESS",
-    "image": "https://ranfitness.com/images/logo_circular_rebrand.png",
-    "@id": "https://ranfitness.com/#gym",
-    "url": "https://ranfitness.com",
+    "image": "https://ran-fitness.vercel.app/images/logo_circular_rebrand.png",
+    "@id": "https://ran-fitness.vercel.app/#gym",
+    "url": "https://ran-fitness.vercel.app",
     "telephone": "+919666345644",
     "priceRange": "₹2000 - ₹5000",
     "address": {
