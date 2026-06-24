@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://ran-fitness.vercel.app';
+  const baseUrl = 'https://ranfitness.com';
   return [
     {
       url: baseUrl,
@@ -10,7 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/member-portal`,
+      url: `${baseUrl}/member-dashboard`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.8,

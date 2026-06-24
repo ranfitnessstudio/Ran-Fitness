@@ -76,6 +76,30 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           colors: ['#FACC15', '#FFFFFF', '#000000'],
         });
 
+        // Trigger Analytics Conversions
+        if (typeof window !== 'undefined') {
+          // GTM Event
+          (window as any).dataLayer = (window as any).dataLayer || [];
+          (window as any).dataLayer.push({
+            event: 'lead_form_submit',
+            lead_source: source,
+            fitness_goal: formData.goal,
+            preferred_time: formData.preferredTime
+          });
+
+          // GA4 Event
+          if (typeof (window as any).gtag === 'function') {
+            (window as any).gtag('event', 'generate_lead', {
+              event_category: 'engagement',
+              event_label: source,
+              value: 1,
+              currency: 'INR',
+              fitness_goal: formData.goal,
+              preferred_time: formData.preferredTime
+            });
+          }
+        }
+
         setIsSuccess(true);
       } else {
         setErrorMsg(data.error || 'Failed to submit booking. Please try again.');

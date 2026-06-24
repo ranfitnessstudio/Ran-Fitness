@@ -551,6 +551,39 @@ export default function Home() {
   }, [plans]);
 
   useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (!anchor) return;
+      
+      const href = anchor.getAttribute('href') || '';
+      
+      if (href.startsWith('tel:')) {
+        // Track phone call click
+        if (typeof window !== 'undefined') {
+          (window as any).dataLayer = (window as any).dataLayer || [];
+          (window as any).dataLayer.push({ event: 'phone_call_click', phone_number: href });
+          if (typeof (window as any).gtag === 'function') {
+            (window as any).gtag('event', 'phone_call', { phone_number: href });
+          }
+        }
+      } else if (href.includes('wa.me') || href.includes('whatsapp.com')) {
+        // Track whatsapp click
+        if (typeof window !== 'undefined') {
+          (window as any).dataLayer = (window as any).dataLayer || [];
+          (window as any).dataLayer.push({ event: 'whatsapp_click', url: href });
+          if (typeof (window as any).gtag === 'function') {
+            (window as any).gtag('event', 'whatsapp_chat', { url: href });
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  useEffect(() => {
     // Theme initialization
     const storedTheme = localStorage.getItem('ran_fitness_color_theme');
     if (storedTheme === 'light' || storedTheme === 'dark') {
