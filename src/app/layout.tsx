@@ -19,9 +19,19 @@ export const metadata: Metadata = {
   description: 'Elite fitness, hybrid CrossFit conditioning, premium Aerofit equipment, personalized coaching, and transformation programs at RAN FITNESS.',
   keywords: 'Best Gym in Habsiguda, CrossFit Gym Habsiguda, Gym Near Me, Fitness Center Habsiguda, Zumba Classes Habsiguda, Ran Fitness Hyderabad',
   metadataBase: new URL('https://ranfitness.com'),
+  manifest: '/manifest.json',
   icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png"
+    icon: [
+      { url: '/favicon-v3.ico', sizes: 'any' },
+      { url: '/icon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-48x48.png', sizes: '48x48', type: 'image/png' },
+      { url: '/icon-64x64.png', sizes: '64x64', type: 'image/png' },
+      { url: '/icon-128x128.png', sizes: '128x128', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon-v3.png', sizes: '180x180', type: 'image/png' }
+    ]
   },
   openGraph: {
     title: 'RAN Fitness | Premium Gym & CrossFit Habsiguda',
@@ -30,11 +40,20 @@ export const metadata: Metadata = {
     siteName: 'RAN Fitness',
     locale: 'en_IN',
     type: 'website',
+    images: [
+      {
+        url: '/images/logo_circular_rebrand.png',
+        width: 1024,
+        height: 1024,
+        alt: 'RAN Fitness Logo',
+      }
+    ]
   },
   twitter: {
     card: 'summary_large_image',
     title: 'RAN Fitness | Premium Gym Habsiguda',
     description: 'Professional Aerofit equipment and certified coaches. Join today!',
+    images: ['/images/logo_circular_rebrand.png'],
   },
   robots: {
     index: true,
